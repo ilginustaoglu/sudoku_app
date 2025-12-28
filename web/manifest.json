@@ -1,6 +1,6 @@
 {
-    "name": "sudoku_app",
-    "short_name": "sudoku_app",
+    "name": "Pandoku",
+    "short_name": "Pandoku",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

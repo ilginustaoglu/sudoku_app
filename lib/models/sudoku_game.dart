@@ -4,10 +4,11 @@ class SudokuGame {
   List<List<int>> currentBoard; // Mevcut durum
   final List<List<bool>> isGiven; // Verilen sayılar (değiştirilemez)
   bool isCompleted;
-  final String difficulty; // Zorluk seviyesi
+  final String difficulty; // Difficulty level
   int score; // Skor
   int errorCount; // Hata sayısı
-  DateTime? startTime; // Oyun başlangıç zamanı
+  DateTime? startTime; // Oyun başlangıç zamanı (timer için)
+  int elapsedSeconds; // Toplam geçen saniye (oyun çıkıldığında kaydedilir) - mutable
 
   SudokuGame({
     required this.puzzle,
@@ -19,6 +20,7 @@ class SudokuGame {
     this.score = 0,
     this.errorCount = 0,
     DateTime? startTime,
+    this.elapsedSeconds = 0,
   }) : currentBoard = currentBoard ?? puzzle.map((row) => List<int>.from(row)).toList(),
         startTime = startTime ?? DateTime.now();
 
@@ -34,6 +36,7 @@ class SudokuGame {
       'score': score,
       'errorCount': errorCount,
       'startTime': startTime?.toIso8601String(),
+      'elapsedSeconds': elapsedSeconds,
     };
   }
 
@@ -45,10 +48,11 @@ class SudokuGame {
       currentBoard: List<List<int>>.from(json['currentBoard'].map((row) => List<int>.from(row))),
       isGiven: List<List<bool>>.from(json['isGiven'].map((row) => List<bool>.from(row))),
       isCompleted: json['isCompleted'] ?? false,
-      difficulty: json['difficulty'] ?? 'Orta',
+      difficulty: json['difficulty'] ?? 'Medium',
       score: json['score'] ?? 0,
       errorCount: json['errorCount'] ?? 0,
       startTime: json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
+      elapsedSeconds: json['elapsedSeconds'] ?? 0,
     );
   }
 
@@ -64,6 +68,7 @@ class SudokuGame {
       score: 0,
       errorCount: 0,
       startTime: DateTime.now(),
+      elapsedSeconds: 0,
     );
   }
 }

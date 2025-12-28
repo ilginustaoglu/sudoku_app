@@ -4,15 +4,15 @@ import '../models/sudoku_game.dart';
 class SudokuGenerator {
   static final Random _random = Random();
 
-  // Zorluk seviyeleri: silinecek hücre sayısı
+  // Difficulty levels: number of cells to remove
   static const Map<String, int> difficultyLevels = {
-    'Kolay': 35,
-    'Orta': 45,
-    'Zor': 55,
+    'Easy': 35,
+    'Medium': 45,
+    'Hard': 55,
   };
 
   // Yeni bir Sudoku oyunu oluştur
-  static SudokuGame generateNewGame({String difficulty = 'Orta'}) {
+  static SudokuGame generateNewGame({String difficulty = 'Medium'}) {
     // Önce tam dolu bir geçerli Sudoku oluştur (çözüm)
     List<List<int>> solution = _generateCompleteSudoku();
     
@@ -32,6 +32,7 @@ class SudokuGenerator {
       score: 0,
       errorCount: 0,
       startTime: DateTime.now(),
+      elapsedSeconds: 0,
     );
   }
 

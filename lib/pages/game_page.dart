@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:audioplayers/audioplayers.dart';
+import 'package:provider/provider.dart';
 import '../services/game_state_manager.dart';
+import '../services/sound_manager.dart';
 import '../models/sudoku_game.dart';
 import '../services/sudoku_generator.dart';
 
@@ -18,8 +21,9 @@ class _GamePageState extends State<GamePage> {
   int selectedRow = -1;
   int selectedCol = -1;
   Timer? _timer;
-  Duration _elapsedTime = Duration.zero;
-  bool get hasErrorLimit => game.difficulty == 'Orta' || game.difficulty == 'Zor';
+  DateTime? _timerStartTime; // Timer'ın bu oturumda başladığı zaman
+  final AudioPlayer _audioPlayer = AudioPlayer();
+  bool get hasErrorLimit => game.difficulty == 'Medium' || game.difficulty == 'Hard';
 
   @override
   void initState() {
@@ -33,19 +37,14 @@ class _GamePageState extends State<GamePage> {
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _stopTimerAndSave();
+    _audioPlayer.dispose();
     super.dispose();
   }
 
   void _startTimer() {
-    // Eğer startTime null ise, şimdiki zamanı başlangıç olarak ayarla
-    if (game.startTime == null) {
-      game.startTime = DateTime.now();
-      widget.gameStateManager.updateGame(game);
-    }
-    
-    // Geçen süreyi hesapla
-    _elapsedTime = DateTime.now().difference(game.startTime!);
+    // Timer başlatıldığında şimdiki zamanı kaydet
+    _timerStartTime = DateTime.now();
     
     // İlk güncelleme
     if (mounted) {
@@ -54,13 +53,33 @@ class _GamePageState extends State<GamePage> {
     
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted && !game.isCompleted) {
-        setState(() {
-          if (game.startTime != null) {
-            _elapsedTime = DateTime.now().difference(game.startTime!);
-          }
-        });
+        setState(() {});
       }
     });
+  }
+
+  void _stopTimerAndSave() {
+    _timer?.cancel();
+    if (_timerStartTime != null) {
+      // Bu oturumda geçen süreyi hesapla ve ekle
+      final sessionElapsed = DateTime.now().difference(_timerStartTime!).inSeconds;
+      game.elapsedSeconds += sessionElapsed;
+      game.startTime = DateTime.now(); // Son durdurulma zamanını kaydet
+      widget.gameStateManager.updateGame(game);
+    }
+  }
+
+  Duration get _elapsedTime {
+    if (game.isCompleted) {
+      // Oyun tamamlandıysa sadece kaydedilmiş süreyi göster
+      return Duration(seconds: game.elapsedSeconds);
+    }
+    
+    // Kaydedilmiş süre + bu oturumda geçen süre
+    final sessionElapsed = _timerStartTime != null 
+        ? DateTime.now().difference(_timerStartTime!).inSeconds 
+        : 0;
+    return Duration(seconds: game.elapsedSeconds + sessionElapsed);
   }
 
   String _formatDuration(Duration duration) {
@@ -130,16 +149,19 @@ class _GamePageState extends State<GamePage> {
       
       game.currentBoard[selectedRow][selectedCol] = number;
       
-      // Hata kontrolü (sadece Orta ve Zor seviyelerde)
+      // Error check (only for Medium and Hard levels)
       // Sadece yeni bir yanlış sayı girildiğinde hata say (önceki değerden farklıysa)
       if (hasErrorLimit && !isCorrect && number != 0 && previousValue != number) {
         game.errorCount++;
         
+        // Yanlış cevap sesi çal
+        _playWrongAnswerSound();
+        
         // 3 hata yapıldıysa oyun kaybedildi
         if (game.errorCount >= 3) {
           game.isCompleted = true;
+          _stopTimerAndSave();
           widget.gameStateManager.completeGame();
-          _timer?.cancel();
           _showGameOverDialog();
           return;
         }
@@ -148,8 +170,9 @@ class _GamePageState extends State<GamePage> {
       // Oyun tamamlandı mı kontrol et
       if (SudokuGenerator.isGameComplete(game.currentBoard, game.solution)) {
         game.isCompleted = true;
+        _stopTimerAndSave();
         widget.gameStateManager.completeGame();
-        _timer?.cancel();
+        _playCongratulationsSound();
         _showCompletionDialog();
       } else {
         // Oyunu kaydet
@@ -169,21 +192,45 @@ class _GamePageState extends State<GamePage> {
     });
   }
 
+  void _playCongratulationsSound() async {
+    final soundManager = Provider.of<SoundManager>(context, listen: false);
+    if (!soundManager.soundEnabled) return;
+    
+    try {
+      await _audioPlayer.play(AssetSource('sounds/congrats.mp3'));
+    } catch (e) {
+      // Ses dosyası yoksa veya hata varsa sessizce devam et
+      debugPrint('Error playing congratulations sound: $e');
+    }
+  }
+
+  void _playWrongAnswerSound() async {
+    final soundManager = Provider.of<SoundManager>(context, listen: false);
+    if (!soundManager.soundEnabled) return;
+    
+    try {
+      await _audioPlayer.play(AssetSource('sounds/wronganswer.mp3'));
+    } catch (e) {
+      // Ses dosyası yoksa veya hata varsa sessizce devam et
+      debugPrint('Error playing wrong answer sound: $e');
+    }
+  }
+
   void _showCompletionDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Tebrikler!'),
-          content: Text('Sudoku\'yu başarıyla tamamladınız!\n\nSkorunuz: ${game.score}'),
+          title: const Text('Congratulations!'),
+          content: Text('You have successfully completed the Sudoku!\n\nScore: ${game.score}'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Dialog'u kapat
                 Navigator.pop(context); // Oyun sayfasından çık
               },
-              child: const Text('Ana Sayfaya Dön'),
+              child: const Text('Back to Home'),
             ),
           ],
         );
@@ -197,15 +244,15 @@ class _GamePageState extends State<GamePage> {
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Oyun Bitti'),
-          content: const Text('3 hata yaptınız. Oyun kaybedildi!'),
+          title: const Text('Game Over'),
+          content: const Text('You made 3 errors. Game lost!'),
           actions: [
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Dialog'u kapat
                 Navigator.pop(context); // Oyun sayfasından çık
               },
-              child: const Text('Ana Sayfaya Dön'),
+              child: const Text('Back to Home'),
             ),
           ],
         );
@@ -227,14 +274,22 @@ class _GamePageState extends State<GamePage> {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.timer, size: 20, color: Colors.white),
+                  Icon(
+                    Icons.timer,
+                    size: 20,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.white
+                        : Colors.black,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     _formatDuration(_elapsedTime),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black,
                     ),
                   ),
                 ],
@@ -244,6 +299,7 @@ class _GamePageState extends State<GamePage> {
           IconButton(
             icon: const Icon(Icons.home),
             onPressed: () {
+              _stopTimerAndSave();
               Navigator.pop(context);
             },
           ),
@@ -261,17 +317,17 @@ class _GamePageState extends State<GamePage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
+                    color: const Color(0xFF2E7D32).withOpacity(0.1), // Koyu yeşil açık ton
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.blue.shade200),
+                    border: Border.all(color: const Color(0xFF2E7D32).withOpacity(0.3)),
                   ),
                   child: Column(
                     children: [
                       Text(
-                        'Skor',
+                        'Score',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Colors.blue.shade700,
+                          color: const Color(0xFF2E7D32), // Koyu yeşil
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -281,14 +337,14 @@ class _GamePageState extends State<GamePage> {
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: Colors.blue.shade900,
+                          color: const Color(0xFF1B5E20), // Daha koyu yeşil
                         ),
                       ),
                     ],
                   ),
                 ),
                 
-                // Hata Sayacı (sadece Orta ve Zor seviyelerde)
+                // Error Counter (only for Medium and Hard levels)
                 if (hasErrorLimit)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
@@ -302,7 +358,7 @@ class _GamePageState extends State<GamePage> {
                     child: Column(
                       children: [
                         Text(
-                          'Hata',
+                          'Error',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.orange.shade700,
@@ -361,44 +417,49 @@ class _GamePageState extends State<GamePage> {
                     // Çözümle karşılaştır (hata sayacı için)
                     bool isCorrect = value == 0 || value == game.solution[row][col];
                     
-                    // Hatalı sayı kontrolü (sadece kullanıcı tarafından girilen sayılar için)
-                    // Orta ve Zor seviyelerde çözümle karşılaştır, Kolay seviyede geçerlilik kontrolü yap
+                    // Error check (only for user-entered numbers)
+                    // For Medium and Hard: compare with solution, for Easy: check validity
                     bool hasError = !isGiven && value != 0 && (
                       hasErrorLimit 
-                        ? !isCorrect  // Orta/Zor: çözümle karşılaştır
-                        : !isValid     // Kolay: geçerlilik kontrolü
+                        ? !isCorrect  // Medium/Hard: compare with solution
+                        : !isValid     // Easy: check validity
                     );
 
+                    // Dark mode kontrolü
+                    final isDark = Theme.of(context).brightness == Brightness.dark;
+                    
                     // Renk belirleme
                     Color textColor;
                     if (isGiven) {
-                      // Baştan verilen sayılar: aynı sayıya tıklandıysa kırmızı, değilse siyah
-                      textColor = isSameValue ? Colors.red : Colors.black;
+                      // Baştan verilen sayılar: aynı sayıya tıklandıysa kırmızı, değilse siyah/beyaz
+                      textColor = isSameValue 
+                          ? Colors.red 
+                          : (isDark ? Colors.white : Colors.black);
                     } else {
                       // Sonradan eklenen sayılar: aynı sayıya tıklandıysa kırmızı, değilse mavi (geçerli)
                       if (isSameValue) {
                         textColor = Colors.red;
                       } else {
                         textColor = isValid
-                            ? Colors.blue.shade700
-                            : Colors.blue.shade700; // Hata durumunda sayı rengi değişmez, sadece arka plan kırmızı olur
+                            ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32)) // Koyu yeşil
+                            : (isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32)); // Hata durumunda sayı rengi değişmez, sadece arka plan kırmızı olur
                       }
                     }
                     
                     // Arka plan rengi belirleme
                     Color backgroundColor;
                     if (isSelected) {
-                      // Seçili hücre: eğer hatalıysa kırmızımsı, değilse mavi
+                      // Seçili hücre: eğer hatalıysa pembemsi, değilse koyu yeşil
                       backgroundColor = hasError 
-                          ? Colors.red.withOpacity(0.4)
-                          : Colors.blue.shade200;
+                          ? Colors.pink.withOpacity(0.4)
+                          : (isDark ? const Color(0xFF2E7D32).withOpacity(0.3) : const Color(0xFF2E7D32).withOpacity(0.2));
                     } else if (hasError) {
-                      // Hatalı sayı: saydam kırmızı arka plan
-                      backgroundColor = Colors.red.withOpacity(0.3);
+                      // Hatalı sayı: saydam pembe arka plan
+                      backgroundColor = Colors.pink.withOpacity(0.3);
                     } else if (isGiven) {
-                      backgroundColor = Colors.grey.shade200;
+                      backgroundColor = isDark ? Colors.grey.shade800 : Colors.grey.shade200;
                     } else {
-                      backgroundColor = Colors.white;
+                      backgroundColor = isDark ? Colors.grey.shade900 : Colors.white;
                     }
 
                     return GestureDetector(
@@ -457,7 +518,7 @@ class _GamePageState extends State<GamePage> {
                     return ElevatedButton(
                       onPressed: isDisabled ? null : () => setNumber(number),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: isDisabled ? Colors.grey : Colors.blue,
+                          backgroundColor: isDisabled ? Colors.grey : const Color(0xFF2E7D32), // Koyu yeşil
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.all(16),
                         minimumSize: const Size(50, 50),
@@ -485,7 +546,7 @@ class _GamePageState extends State<GamePage> {
                       return ElevatedButton(
                         onPressed: isDisabled ? null : () => setNumber(number),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: isDisabled ? Colors.grey : Colors.blue,
+                          backgroundColor: isDisabled ? Colors.grey : const Color(0xFF2E7D32), // Koyu yeşil
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.all(16),
                           minimumSize: const Size(50, 50),

@@ -5,6 +5,8 @@ import '../services/sudoku_generator.dart';
 import '../models/sudoku_game.dart';
 import 'game_page.dart';
 import 'settings_page.dart';
+import 'theme_selection_page.dart';
+import 'other_apps_page.dart';
 
 class HomePage extends StatelessWidget {
   final GameStateManager gameStateManager;
@@ -14,17 +16,49 @@ class HomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.blue.shade50,
-              Colors.white,
-            ],
-          ),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        elevation: 0,
+        backgroundColor: Colors.white,
+        iconTheme: const IconThemeData(
+          color: Colors.black,
         ),
+        actions: [
+          // Bambu ikonu - Diğer uygulamalar
+          IconButton(
+            icon: Image.asset(
+              'assets/images/bamboo.png',
+              width: 24,
+              height: 24,
+              errorBuilder: (context, error, stackTrace) {
+                return const Icon(Icons.eco, color: Color(0xFF2E7D32)); // Koyu yeşil
+              },
+            ),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const OtherAppsPage(),
+                ),
+              );
+            },
+          ),
+          // Ayarlar çarkı (koyu yeşil)
+          IconButton(
+            icon: const Icon(Icons.settings, color: Color(0xFF2E7D32)), // Koyu yeşil
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SettingsPage(),
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: Container(
+        color: Colors.white,
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(24.0),
@@ -33,37 +67,53 @@ class HomePage extends StatelessWidget {
               children: [
                 const Spacer(flex: 2),
                 
-                // Logo (geçici)
+                // Logo
                 Container(
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: Colors.blue.shade400,
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.blue.shade200,
+                        color: Colors.black.withOpacity(0.1),
                         blurRadius: 20,
                         spreadRadius: 5,
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.grid_4x4,
-                    size: 60,
-                    color: Colors.white,
+                  child: ClipOval(
+                    child: Image.asset(
+                      'assets/images/pandacover.png',
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Logo yoksa geçici ikon göster
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF6F4E37), // Kahve rengi
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.grid_4x4,
+                            size: 60,
+                            color: Colors.white,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ),
                 
                 const SizedBox(height: 24),
                 
-                // Uygulama Adı (geçici)
+                // Uygulama Adı
                 const Text(
-                  'Sudoku Master',
+                  'Pandoku',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blue,
+                    color: Color(0xFF6F4E37), // Kahve rengi
                     letterSpacing: 1.2,
                   ),
                 ),
@@ -84,7 +134,7 @@ class HomePage extends StatelessWidget {
                             context,
                             'Continue',
                             Icons.play_arrow,
-                            Colors.green,
+                            const Color(0xFF2E7D32), // Koyu yeşil
                             () {
                               Navigator.push(
                                 context,
@@ -101,7 +151,7 @@ class HomePage extends StatelessWidget {
                             context,
                             'New Game',
                             Icons.refresh,
-                            Colors.blue,
+                            const Color(0xFF6F4E37), // Kahve rengi
                             () {
                               _showDifficultyDialog(context);
                             },
@@ -114,30 +164,12 @@ class HomePage extends StatelessWidget {
                         context,
                         'Play',
                         Icons.play_arrow,
-                        Colors.blue,
+                        const Color(0xFF6F4E37), // Kahve rengi
                         () {
                           _showDifficultyDialog(context);
                         },
                       );
                     }
-                  },
-                ),
-                
-                const SizedBox(height: 16),
-                
-                // Ayarlar Butonu
-                _buildButton(
-                  context,
-                  'Settings',
-                  Icons.settings,
-                  Colors.grey,
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SettingsPage(),
-                      ),
-                    );
                   },
                 ),
                 
@@ -193,29 +225,29 @@ class HomePage extends StatelessWidget {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Zorluk Seviyesi Seçin'),
+          title: const Text('Select Difficulty Level'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildDifficultyOption(
                 dialogContext,
-                'Kolay',
-                Colors.green,
-                () => _startNewGame(context, dialogContext, 'Kolay'),
+                'Easy',
+                const Color(0xFF2E7D32), // Koyu yeşil
+                () => _startNewGame(context, dialogContext, 'Easy'),
               ),
               const SizedBox(height: 12),
               _buildDifficultyOption(
                 dialogContext,
-                'Orta',
+                'Medium',
                 Colors.orange,
-                () => _startNewGame(context, dialogContext, 'Orta'),
+                () => _startNewGame(context, dialogContext, 'Medium'),
               ),
               const SizedBox(height: 12),
               _buildDifficultyOption(
                 dialogContext,
-                'Zor',
+                'Hard',
                 Colors.red,
-                () => _startNewGame(context, dialogContext, 'Zor'),
+                () => _startNewGame(context, dialogContext, 'Hard'),
               ),
             ],
           ),
