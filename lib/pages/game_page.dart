@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
@@ -16,7 +17,7 @@ class GamePage extends StatefulWidget {
   State<GamePage> createState() => _GamePageState();
 }
 
-class _GamePageState extends State<GamePage> {
+class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   late SudokuGame game;
   int selectedRow = -1;
   int selectedCol = -1;
@@ -24,6 +25,14 @@ class _GamePageState extends State<GamePage> {
   DateTime? _timerStartTime; // Timer'ın bu oturumda başladığı zaman
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool get hasErrorLimit => game.difficulty == 'Medium' || game.difficulty == 'Hard';
+  
+  // Tamamlanan satır/sütun animasyonları için
+  Map<int, AnimationController> _rowAnimations = {};
+  Map<int, AnimationController> _colAnimations = {};
+  Map<int, AnimationController> _blockAnimations = {}; // Blok animasyonları (blockIndex -> controller)
+  Set<int> _completedRows = {};
+  Set<int> _completedCols = {};
+  Set<int> _completedBlocks = {}; // Tamamlanan 3x3 bloklar (0-8)
 
   @override
   void initState() {
@@ -39,6 +48,16 @@ class _GamePageState extends State<GamePage> {
   void dispose() {
     _stopTimerAndSave();
     _audioPlayer.dispose();
+    // Animasyon controller'ları temizle
+    for (var controller in _rowAnimations.values) {
+      controller.dispose();
+    }
+    for (var controller in _colAnimations.values) {
+      controller.dispose();
+    }
+    for (var controller in _blockAnimations.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
@@ -126,6 +145,146 @@ class _GamePageState extends State<GamePage> {
     return _countNumberInBoard(number) >= 9;
   }
 
+  // Bir satır tamamlanmış mı kontrol et
+  bool _isRowComplete(int row) {
+    Set<int> numbers = {};
+    for (int col = 0; col < 9; col++) {
+      int value = game.currentBoard[row][col];
+      if (value == 0) return false;
+      if (numbers.contains(value)) return false; // Tekrar eden sayı
+      numbers.add(value);
+    }
+    return numbers.length == 9;
+  }
+
+  // Bir sütun tamamlanmış mı kontrol et
+  bool _isColComplete(int col) {
+    Set<int> numbers = {};
+    for (int row = 0; row < 9; row++) {
+      int value = game.currentBoard[row][col];
+      if (value == 0) return false;
+      if (numbers.contains(value)) return false; // Tekrar eden sayı
+      numbers.add(value);
+    }
+    return numbers.length == 9;
+  }
+
+  // Bir 3x3 blok tamamlanmış mı kontrol et
+  bool _isBlockComplete(int blockIndex) {
+    // Blok index'inden başlangıç pozisyonunu hesapla
+    int startRow = (blockIndex ~/ 3) * 3;
+    int startCol = (blockIndex % 3) * 3;
+    
+    Set<int> numbers = {};
+    for (int i = 0; i < 3; i++) {
+      for (int j = 0; j < 3; j++) {
+        int value = game.currentBoard[startRow + i][startCol + j];
+        if (value == 0) return false;
+        if (numbers.contains(value)) return false; // Tekrar eden sayı
+        numbers.add(value);
+      }
+    }
+    return numbers.length == 9;
+  }
+
+  // Tamamlanan satır/sütun/blokları kontrol et ve animasyon başlat
+  void _checkCompletedRowsAndCols() {
+    // Satırları kontrol et
+    for (int row = 0; row < 9; row++) {
+      if (_isRowComplete(row) && !_completedRows.contains(row)) {
+        _completedRows.add(row);
+        _playColumnCompletionSound();
+        _startRowAnimation(row);
+      }
+    }
+    
+    // Sütunları kontrol et
+    for (int col = 0; col < 9; col++) {
+      if (_isColComplete(col) && !_completedCols.contains(col)) {
+        _completedCols.add(col);
+        _playColumnCompletionSound();
+        _startColAnimation(col);
+      }
+    }
+    
+    // Blokları kontrol et (0-8 arası 9 blok)
+    for (int blockIndex = 0; blockIndex < 9; blockIndex++) {
+      if (_isBlockComplete(blockIndex) && !_completedBlocks.contains(blockIndex)) {
+        _completedBlocks.add(blockIndex);
+        _playColumnCompletionSound();
+        _startBlockAnimation(blockIndex);
+      }
+    }
+  }
+
+  // Satır animasyonu başlat
+  void _startRowAnimation(int row) {
+    if (!_rowAnimations.containsKey(row)) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1800),
+      );
+      _rowAnimations[row] = controller;
+    }
+    // Reset ve başlat (smooth animasyon için)
+    if (_rowAnimations[row]!.isAnimating) {
+      _rowAnimations[row]!.stop();
+    }
+    _rowAnimations[row]!.reset();
+    _rowAnimations[row]!.forward().then((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted && _rowAnimations.containsKey(row)) {
+          _rowAnimations[row]!.reverse();
+        }
+      });
+    });
+  }
+
+  // Sütun animasyonu başlat
+  void _startColAnimation(int col) {
+    if (!_colAnimations.containsKey(col)) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1800),
+      );
+      _colAnimations[col] = controller;
+    }
+    // Reset ve başlat (smooth animasyon için)
+    if (_colAnimations[col]!.isAnimating) {
+      _colAnimations[col]!.stop();
+    }
+    _colAnimations[col]!.reset();
+    _colAnimations[col]!.forward().then((_) {
+      Future.delayed(const Duration(milliseconds: 150), () {
+        if (mounted && _colAnimations.containsKey(col)) {
+          _colAnimations[col]!.reverse();
+        }
+      });
+    });
+  }
+
+  // Blok animasyonu başlat (3x3 blok için)
+  void _startBlockAnimation(int blockIndex) {
+    if (!_blockAnimations.containsKey(blockIndex)) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1000),
+      );
+      _blockAnimations[blockIndex] = controller;
+    }
+    // Reset ve başlat
+    if (_blockAnimations[blockIndex]!.isAnimating) {
+      _blockAnimations[blockIndex]!.stop();
+    }
+    _blockAnimations[blockIndex]!.reset();
+    _blockAnimations[blockIndex]!.forward();
+  }
+  
+  // Bir hücrenin hangi blokta olduğunu hesapla (0-8)
+  int _getBlockIndex(int row, int col) {
+    return (row ~/ 3) * 3 + (col ~/ 3);
+  }
+
   void setNumber(int number) {
     if (selectedRow == -1 || selectedCol == -1) return;
     if (game.isGiven[selectedRow][selectedCol]) return; // Verilen sayılar değiştirilemez
@@ -166,6 +325,9 @@ class _GamePageState extends State<GamePage> {
           return;
         }
       }
+      
+      // Tamamlanan satır/sütunları kontrol et
+      _checkCompletedRowsAndCols();
       
       // Oyun tamamlandı mı kontrol et
       if (SudokuGenerator.isGameComplete(game.currentBoard, game.solution)) {
@@ -216,6 +378,18 @@ class _GamePageState extends State<GamePage> {
     }
   }
 
+  void _playColumnCompletionSound() async {
+    final soundManager = Provider.of<SoundManager>(context, listen: false);
+    if (!soundManager.soundEnabled) return;
+    
+    try {
+      await _audioPlayer.play(AssetSource('sounds/columncompletion.mp3'));
+    } catch (e) {
+      // Ses dosyası yoksa veya hata varsa sessizce devam et
+      debugPrint('Error playing column completion sound: $e');
+    }
+  }
+
   void _showCompletionDialog() {
     showDialog(
       context: context,
@@ -228,6 +402,8 @@ class _GamePageState extends State<GamePage> {
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Dialog'u kapat
+                // Tamamlanmış oyunu temizle
+                widget.gameStateManager.clearGame();
                 Navigator.pop(context); // Oyun sayfasından çık
               },
               child: const Text('Back to Home'),
@@ -250,6 +426,8 @@ class _GamePageState extends State<GamePage> {
             TextButton(
               onPressed: () {
                 Navigator.pop(context); // Dialog'u kapat
+                // Oyunu temizle
+                widget.gameStateManager.clearGame();
                 Navigator.pop(context); // Oyun sayfasından çık
               },
               child: const Text('Back to Home'),
@@ -397,6 +575,7 @@ class _GamePageState extends State<GamePage> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: GridView.builder(
+                  physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 9,
                   ),
@@ -446,9 +625,31 @@ class _GamePageState extends State<GamePage> {
                       }
                     }
                     
+                    // Animasyon değerleri
+                    double rowAnimationValue = _rowAnimations.containsKey(row) 
+                        ? _rowAnimations[row]!.value 
+                        : 0.0;
+                    double colAnimationValue = _colAnimations.containsKey(col) 
+                        ? _colAnimations[col]!.value 
+                        : 0.0;
+                    double maxAnimationValue = rowAnimationValue > colAnimationValue 
+                        ? rowAnimationValue 
+                        : colAnimationValue;
+                    
                     // Arka plan rengi belirleme
                     Color backgroundColor;
-                    if (isSelected) {
+                    if (maxAnimationValue > 0) {
+                      // Animasyon aktif: yeşil renk geçişi
+                      final greenColor = const Color(0xFF2E7D32);
+                      final baseColor = isGiven 
+                          ? (isDark ? Colors.grey.shade800 : Colors.grey.shade200)
+                          : (isDark ? Colors.grey.shade900 : Colors.white);
+                      backgroundColor = Color.lerp(
+                        baseColor,
+                        greenColor.withOpacity(0.6),
+                        maxAnimationValue,
+                      )!;
+                    } else if (isSelected) {
                       // Seçili hücre: eğer hatalıysa pembemsi, değilse koyu yeşil
                       backgroundColor = hasError 
                           ? Colors.pink.withOpacity(0.4)
@@ -462,40 +663,127 @@ class _GamePageState extends State<GamePage> {
                       backgroundColor = isDark ? Colors.grey.shade900 : Colors.white;
                     }
 
+                    final blockIndex = _getBlockIndex(row, col);
+                    final blockController = _blockAnimations[blockIndex];
+                    
+                    // Animasyon listener listesi
+                    List<Listenable> animationListeners = [];
+                    if (_rowAnimations.containsKey(row)) {
+                      animationListeners.add(_rowAnimations[row]!);
+                    }
+                    if (_colAnimations.containsKey(col)) {
+                      animationListeners.add(_colAnimations[col]!);
+                    }
+                    if (blockController != null) {
+                      animationListeners.add(blockController);
+                    }
+
                     return GestureDetector(
                       onTap: () => selectCell(row, col),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          border: Border(
-                            top: BorderSide(
-                              width: row % 3 == 0 ? 2.5 : 0.5,
-                              color: Colors.grey.shade600,
+                      child: AnimatedBuilder(
+                        animation: animationListeners.isEmpty 
+                            ? Listenable.merge([]) 
+                            : Listenable.merge(animationListeners),
+                        builder: (context, child) {
+                          // Animasyon değerlerini hesapla (smooth curve ile)
+                          double rowAnimValue = _rowAnimations.containsKey(row) 
+                              ? Curves.easeOutCubic.transform(_rowAnimations[row]!.value)
+                              : 0.0;
+                          double colAnimValue = _colAnimations.containsKey(col) 
+                              ? Curves.easeOutCubic.transform(_colAnimations[col]!.value)
+                              : 0.0;
+                          double blockAnimValue = blockController != null
+                              ? Curves.easeOutCubic.transform(blockController.value)
+                              : 0.0;
+                          
+                          // Satır/sütun animasyonu için scale faktörü (iç ortadan dışına - smooth)
+                          double rowColScale = 1.0;
+                          if (rowAnimValue > 0 || colAnimValue > 0) {
+                            final maxRowColValue = rowAnimValue > colAnimValue ? rowAnimValue : colAnimValue;
+                            // İç ortadan dışına: 0.85'den 1.0'a smooth scale
+                            rowColScale = 0.85 + (maxRowColValue * 0.15);
+                          }
+                          
+                          // Blok animasyonu için scale faktörü (iç ortadan dışına - smooth)
+                          double blockScale = 1.0;
+                          if (blockAnimValue > 0) {
+                            // İç ortadan dışına: 0.85'den 1.0'a smooth scale
+                            blockScale = 0.85 + (blockAnimValue * 0.15);
+                          }
+                          
+                          // Hangi scale'i kullanacağız (en yüksek olan)
+                          final finalScale = rowColScale > blockScale ? rowColScale : blockScale;
+                          
+                          // Arka plan rengi belirleme (animasyonlu - smooth geçişler)
+                          Color animBackgroundColor;
+                          final maxAnimValue = rowAnimValue > colAnimValue 
+                              ? rowAnimValue 
+                              : colAnimValue;
+                          final maxAllAnimValue = maxAnimValue > blockAnimValue 
+                              ? maxAnimValue 
+                              : blockAnimValue;
+                          
+                          if (maxAllAnimValue > 0) {
+                            // Animasyon aktif: yeşil renk geçişi (iç ortadan dışına - smooth)
+                            final greenColor = const Color(0xFF2E7D32);
+                            final baseColor = isGiven 
+                                ? (isDark ? Colors.grey.shade800 : Colors.grey.shade200)
+                                : (isDark ? Colors.grey.shade900 : Colors.white);
+                            // Yumuşak opacity geçişi
+                            animBackgroundColor = Color.lerp(
+                              baseColor,
+                              greenColor.withOpacity(0.4 * (1 - maxAllAnimValue)),
+                              maxAllAnimValue,
+                            )!;
+                          } else {
+                            animBackgroundColor = backgroundColor;
+                          }
+                          
+                          return Transform.scale(
+                            scale: finalScale,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                border: Border(
+                                  top: BorderSide(
+                                    width: row % 3 == 0 ? 2.5 : 0.5,
+                                    color: maxAllAnimValue > 0 
+                                        ? const Color(0xFF2E7D32).withOpacity(0.3 + maxAllAnimValue * 0.5)
+                                        : Colors.grey.shade600,
+                                  ),
+                                  left: BorderSide(
+                                    width: col % 3 == 0 ? 2.5 : 0.5,
+                                    color: maxAllAnimValue > 0 
+                                        ? const Color(0xFF2E7D32).withOpacity(0.3 + maxAllAnimValue * 0.5)
+                                        : Colors.grey.shade600,
+                                  ),
+                                  right: BorderSide(
+                                    width: col == 8 ? 2.5 : 0.5,
+                                    color: maxAllAnimValue > 0 
+                                        ? const Color(0xFF2E7D32).withOpacity(0.3 + maxAllAnimValue * 0.5)
+                                        : Colors.grey.shade600,
+                                  ),
+                                  bottom: BorderSide(
+                                    width: row == 8 ? 2.5 : 0.5,
+                                    color: maxAllAnimValue > 0 
+                                        ? const Color(0xFF2E7D32).withOpacity(0.3 + maxAllAnimValue * 0.5)
+                                        : Colors.grey.shade600,
+                                  ),
+                                ),
+                                color: animBackgroundColor,
+                              ),
+                              child: Center(
+                                child: Text(
+                                  value == 0 ? '' : value.toString(),
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w900, // Tüm sayılar kalın
+                                    color: textColor,
+                                  ),
+                                ),
+                              ),
                             ),
-                            left: BorderSide(
-                              width: col % 3 == 0 ? 2.5 : 0.5,
-                              color: Colors.grey.shade600,
-                            ),
-                            right: BorderSide(
-                              width: col == 8 ? 2.5 : 0.5,
-                              color: Colors.grey.shade600,
-                            ),
-                            bottom: BorderSide(
-                              width: row == 8 ? 2.5 : 0.5,
-                              color: Colors.grey.shade600,
-                            ),
-                          ),
-                          color: backgroundColor,
-                        ),
-                        child: Center(
-                          child: Text(
-                            value == 0 ? '' : value.toString(),
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w900, // Tüm sayılar kalın
-                              color: textColor,
-                            ),
-                          ),
-                        ),
+                          );
+                        },
                       ),
                     );
                   },

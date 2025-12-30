@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/game_state_manager.dart';
 import '../services/sudoku_generator.dart';
+import '../services/daily_game_manager.dart';
 import '../models/sudoku_game.dart';
 import 'game_page.dart';
 import 'settings_page.dart';
 import 'theme_selection_page.dart';
 import 'other_apps_page.dart';
+import 'calendar_page.dart';
+import 'statistics_page.dart';
 
 class HomePage extends StatelessWidget {
   final GameStateManager gameStateManager;
@@ -22,6 +25,19 @@ class HomePage extends StatelessWidget {
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(
           color: Colors.black,
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
+          onPressed: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => CalendarPage(
+                  gameStateManager: gameStateManager,
+                ),
+              ),
+            );
+          },
         ),
         actions: [
           // Bambu ikonu - Diğer uygulamalar
@@ -151,7 +167,7 @@ class HomePage extends StatelessWidget {
                             context,
                             'New Game',
                             Icons.refresh,
-                            const Color(0xFF6F4E37), // Kahve rengi
+                            const Color(0xFF2E7D32), // Koyu yeşil
                             () {
                               _showDifficultyDialog(context);
                             },
@@ -164,12 +180,56 @@ class HomePage extends StatelessWidget {
                         context,
                         'Play',
                         Icons.play_arrow,
-                        const Color(0xFF6F4E37), // Kahve rengi
+                        const Color(0xFF2E7D32), // Koyu yeşil
                         () {
                           _showDifficultyDialog(context);
                         },
                       );
                     }
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // Bugünün Oyunu butonu
+                _buildButton(
+                  context,
+                  'Today\'s Game',
+                  Icons.today,
+                  const Color(0xFF6F4E37), // Kahve rengi
+                  () async {
+                    final dailyGameManager = DailyGameManager();
+                    final today = DateTime.now();
+                    final game = await dailyGameManager.getDailyGame(today);
+                    gameStateManager.startNewGame(game);
+                    if (context.mounted) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => GamePage(
+                            gameStateManager: gameStateManager,
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // İstatistik butonu
+                _buildButton(
+                  context,
+                  'Statistics',
+                  Icons.bar_chart,
+                  const Color(0xFF6F4E37), // Kahve rengi
+                  () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const StatisticsPage(),
+                      ),
+                    );
                   },
                 ),
                 

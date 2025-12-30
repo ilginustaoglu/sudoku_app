@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/sudoku_game.dart';
+import 'statistics_manager.dart';
+import 'daily_game_manager.dart';
 
 class GameStateManager extends ChangeNotifier {
   SudokuGame? _currentGame;
@@ -64,6 +66,18 @@ class GameStateManager extends ChangeNotifier {
   void updateGame(SudokuGame game) {
     _currentGame = game;
     _saveGame(); // async çağrı, await edilmiyor ama sorun değil
+    
+    // Eğer bugünün günlük oyunu ise kaydet (tamamlanmamış olsa bile)
+    final dailyGameManager = DailyGameManager();
+    final now = DateTime.now();
+    if (game.startTime != null) {
+      final gameDate = DateTime(game.startTime!.year, game.startTime!.month, game.startTime!.day);
+      final today = DateTime(now.year, now.month, now.day);
+      if (gameDate == today) {
+        dailyGameManager.saveDailyGame(now, game);
+      }
+    }
+    
     notifyListeners();
   }
 
@@ -72,6 +86,16 @@ class GameStateManager extends ChangeNotifier {
     if (_currentGame != null) {
       _currentGame!.isCompleted = true;
       _saveGame(); // async çağrı, await edilmiyor ama sorun değil
+      
+      // İstatistikleri kaydet
+      final statisticsManager = StatisticsManager();
+      final now = DateTime.now();
+      statisticsManager.recordCompletedGame(now);
+      
+      // Eğer bugünün günlük oyunu ise kaydet
+      final dailyGameManager = DailyGameManager();
+      dailyGameManager.saveDailyGame(now, _currentGame!);
+      
       notifyListeners();
     }
   }
