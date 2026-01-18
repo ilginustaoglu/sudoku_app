@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import '../services/game_state_manager.dart';
 import '../services/sound_manager.dart';
+import '../services/highlight_color_manager.dart';
 import '../models/sudoku_game.dart';
 import '../services/sudoku_generator.dart';
 
@@ -440,8 +441,10 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
+    return Consumer<HighlightColorManager>(
+      builder: (context, highlightColorManager, child) {
+        return Scaffold(
+          appBar: AppBar(
         title: const Text('Sudoku'),
         centerTitle: true,
         actions: [
@@ -608,16 +611,18 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
                     final isDark = Theme.of(context).brightness == Brightness.dark;
                     
                     // Renk belirleme
+                    final highlightColor = highlightColorManager.highlightColor;
+                    
                     Color textColor;
                     if (isGiven) {
-                      // Baştan verilen sayılar: aynı sayıya tıklandıysa kırmızı, değilse siyah/beyaz
+                      // Baştan verilen sayılar: aynı sayıya tıklandıysa seçili renk, değilse siyah/beyaz
                       textColor = isSameValue 
-                          ? Colors.red 
+                          ? highlightColor 
                           : (isDark ? Colors.white : Colors.black);
                     } else {
-                      // Sonradan eklenen sayılar: aynı sayıya tıklandıysa kırmızı, değilse mavi (geçerli)
+                      // Sonradan eklenen sayılar: aynı sayıya tıklandıysa seçili renk, değilse yeşil (geçerli)
                       if (isSameValue) {
-                        textColor = Colors.red;
+                        textColor = highlightColor;
                       } else {
                         textColor = isValid
                             ? (isDark ? const Color(0xFF66BB6A) : const Color(0xFF2E7D32)) // Koyu yeşil
@@ -868,6 +873,8 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
           const SizedBox(height: 20),
         ],
       ),
-    );
+          );
+        },
+      );
   }
 }

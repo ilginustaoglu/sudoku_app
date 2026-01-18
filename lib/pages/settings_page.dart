@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/theme_manager.dart';
 import '../services/sound_manager.dart';
+import '../services/highlight_color_manager.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -81,6 +82,67 @@ class SettingsPage extends StatelessWidget {
                   value: soundManager.soundEnabled,
                   onChanged: (value) {
                     soundManager.setSoundEnabled(value);
+                  },
+                ),
+              );
+            },
+          ),
+          const Divider(),
+          Consumer<HighlightColorManager>(
+            builder: (context, highlightColorManager, child) {
+              return ListTile(
+                leading: Icon(
+                  Icons.colorize,
+                  color: highlightColorManager.highlightColor,
+                ),
+                title: const Text('Highlight Color'),
+                subtitle: Text(
+                  'Selected: ${highlightColorManager.getColorName(highlightColorManager.highlightColor)}',
+                ),
+                trailing: PopupMenuButton<Color>(
+                  icon: Icon(
+                    Icons.chevron_right,
+                    color: highlightColorManager.highlightColor,
+                  ),
+                  onSelected: (Color color) {
+                    highlightColorManager.setHighlightColor(color);
+                  },
+                  itemBuilder: (BuildContext context) {
+                    return HighlightColorManager.availableColors.map((colorMap) {
+                      final color = colorMap['color'] as Color;
+                      final name = colorMap['name'] as String;
+                      final isSelected = highlightColorManager.highlightColor == color;
+                      
+                      return PopupMenuItem<Color>(
+                        value: color,
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.grey.shade400,
+                                  width: 1,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Text(name),
+                            if (isSelected) ...[
+                              const Spacer(),
+                              Icon(
+                                Icons.check,
+                                color: color,
+                                size: 20,
+                              ),
+                            ],
+                          ],
+                        ),
+                      );
+                    }).toList();
                   },
                 ),
               );

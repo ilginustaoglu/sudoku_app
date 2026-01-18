@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'services/game_state_manager.dart';
 import 'services/theme_manager.dart';
 import 'services/sound_manager.dart';
+import 'services/highlight_color_manager.dart';
 import 'pages/home_page.dart';
 
 void main() {
@@ -19,6 +20,7 @@ class SudokuApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeManager()),
         ChangeNotifierProvider(create: (_) => GameStateManager()),
         ChangeNotifierProvider(create: (_) => SoundManager()),
+        ChangeNotifierProvider(create: (_) => HighlightColorManager()),
       ],
       child: Consumer<ThemeManager>(
         builder: (context, themeManager, child) {
