@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/game_state_manager.dart';
+import '../services/profile_manager.dart';
 import '../services/sudoku_generator.dart';
 import '../services/daily_game_manager.dart';
 import '../models/sudoku_game.dart';
 import 'game_page.dart';
 import 'settings_page.dart';
-import 'theme_selection_page.dart';
 import 'other_apps_page.dart';
 import 'calendar_page.dart';
-import 'statistics_page.dart';
+import 'login_page.dart';
+import 'register_page.dart';
+import 'user_profile_display_page.dart';
 
 class HomePage extends StatelessWidget {
   final GameStateManager gameStateManager;
@@ -40,6 +42,41 @@ class HomePage extends StatelessWidget {
           },
         ),
         actions: [
+          // Profil butonu (sadece giriş yapılmışsa göster)
+          Consumer<ProfileManager>(
+            builder: (context, profileManager, child) {
+              // Sadece profil durumu değiştiğinde rebuild et
+              if (!profileManager.isGuestMode && profileManager.currentProfile != null) {
+                final avatarColor = profileManager.currentProfile?.avatarColor;
+                return GestureDetector(
+                  onTap: () {
+                    // Profil sayfasına git
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const UserProfileDisplayPage(),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                    child: CircleAvatar(
+                      radius: 18,
+                      backgroundColor: avatarColor != null
+                          ? Color(avatarColor)
+                          : Colors.grey.shade300,
+                      child: const Icon(
+                        Icons.person,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return const SizedBox.shrink();
+            },
+          ),
           // Bambu ikonu - Diğer uygulamalar
           IconButton(
             icon: Image.asset(
@@ -139,6 +176,7 @@ class HomePage extends StatelessWidget {
                 // Oyun durumuna göre butonlar
                 Consumer<GameStateManager>(
                   builder: (context, manager, child) {
+                    // Initialization constructor'da başlatılıyor (non-blocking)
                     if (manager.isLoading) {
                       return const CircularProgressIndicator();
                     }
@@ -217,19 +255,43 @@ class HomePage extends StatelessWidget {
                 
                 const SizedBox(height: 16),
                 
-                // İstatistik butonu
-                _buildButton(
-                  context,
-                  'Statistics',
-                  Icons.bar_chart,
-                  const Color(0xFF6F4E37), // Kahve rengi
-                  () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const StatisticsPage(),
-                      ),
-                    );
+                // Pandaccount butonu
+                Consumer<ProfileManager>(
+                  builder: (context, profileManager, child) {
+                    if (profileManager.isGuestMode) {
+                      return _buildButton(
+                        context,
+                        'Enter/Create via Pandaccount',
+                        Icons.account_circle,
+                        const Color(0xFF6F4E37), // Kahve rengi
+                        () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const LoginPage(),
+                            ),
+                          );
+                        },
+                      );
+                    } else {
+                      // Profil varsa sadece çıkış butonu göster
+                      return _buildButton(
+                        context,
+                        'Logout',
+                        Icons.logout,
+                        Colors.red.shade300,
+                        () async {
+                          await profileManager.logout();
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Logged out successfully'),
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    }
                   },
                 ),
                 

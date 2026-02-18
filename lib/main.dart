@@ -4,9 +4,13 @@ import 'services/game_state_manager.dart';
 import 'services/theme_manager.dart';
 import 'services/sound_manager.dart';
 import 'services/highlight_color_manager.dart';
+import 'services/profile_manager.dart';
+import 'services/statistics_visibility_manager.dart';
+import 'services/profile_visibility_manager.dart';
 import 'pages/home_page.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const SudokuApp());
 }
 
@@ -21,6 +25,9 @@ class SudokuApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => GameStateManager()),
         ChangeNotifierProvider(create: (_) => SoundManager()),
         ChangeNotifierProvider(create: (_) => HighlightColorManager()),
+        ChangeNotifierProvider(create: (_) => ProfileManager()),
+        ChangeNotifierProvider(create: (_) => StatisticsVisibilityManager()),
+        ChangeNotifierProvider(create: (_) => ProfileVisibilityManager()),
       ],
       child: Consumer<ThemeManager>(
         builder: (context, themeManager, child) {

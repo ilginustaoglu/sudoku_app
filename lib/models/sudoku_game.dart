@@ -9,6 +9,7 @@ class SudokuGame {
   int errorCount; // Hata sayısı
   DateTime? startTime; // Oyun başlangıç zamanı (timer için)
   int elapsedSeconds; // Toplam geçen saniye (oyun çıkıldığında kaydedilir) - mutable
+  List<List<Set<int>>> notes; // Notlar (her hücre için olası sayılar)
 
   SudokuGame({
     required this.puzzle,
@@ -21,8 +22,10 @@ class SudokuGame {
     this.errorCount = 0,
     DateTime? startTime,
     this.elapsedSeconds = 0,
+    List<List<Set<int>>>? notes,
   }) : currentBoard = currentBoard ?? puzzle.map((row) => List<int>.from(row)).toList(),
-        startTime = startTime ?? DateTime.now();
+        startTime = startTime ?? DateTime.now(),
+        notes = notes ?? List.generate(9, (_) => List.generate(9, (_) => <int>{}));
 
   // Oyunu JSON'a çevir (kayıt için)
   Map<String, dynamic> toJson() {
@@ -37,11 +40,23 @@ class SudokuGame {
       'errorCount': errorCount,
       'startTime': startTime?.toIso8601String(),
       'elapsedSeconds': elapsedSeconds,
+      'notes': notes.map((row) => row.map((noteSet) => noteSet.toList()).toList()).toList(),
     };
   }
 
   // JSON'dan oyun oluştur
   factory SudokuGame.fromJson(Map<String, dynamic> json) {
+    List<List<Set<int>>> notesData;
+    if (json['notes'] != null) {
+      notesData = List<List<Set<int>>>.from(
+        json['notes'].map((row) => List<Set<int>>.from(
+          row.map((noteList) => Set<int>.from(noteList))
+        ))
+      );
+    } else {
+      notesData = List.generate(9, (_) => List.generate(9, (_) => <int>{}));
+    }
+    
     return SudokuGame(
       puzzle: List<List<int>>.from(json['puzzle'].map((row) => List<int>.from(row))),
       solution: List<List<int>>.from(json['solution'].map((row) => List<int>.from(row))),
@@ -53,6 +68,7 @@ class SudokuGame {
       errorCount: json['errorCount'] ?? 0,
       startTime: json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
       elapsedSeconds: json['elapsedSeconds'] ?? 0,
+      notes: notesData,
     );
   }
 
@@ -69,6 +85,7 @@ class SudokuGame {
       errorCount: 0,
       startTime: DateTime.now(),
       elapsedSeconds: 0,
+      notes: List.generate(9, (_) => List.generate(9, (_) => <int>{})),
     );
   }
 }

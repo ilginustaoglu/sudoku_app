@@ -12,16 +12,38 @@ class GameStateManager extends ChangeNotifier {
   bool get hasOngoingGame => !_isLoading && _currentGame != null && !_currentGame!.isCompleted;
   SudokuGame? get currentGame => _currentGame;
   bool get isLoading => _isLoading;
+  
+  // Lazy initialization - ilk kullanımda başlat
+  void ensureInitialized() {
+    if (_isLoading && !_isInitializing) {
+      _initialize();
+    }
+  }
+
+  bool _isInitializing = false;
 
   GameStateManager() {
-    _initialize();
+    // Tamamen lazy initialization - sadece gerektiğinde başlat
+    // UI render'ı hiç bloklamaz
+    // Initialization'ı hemen başlat ama await etme (non-blocking)
+    // Sadece bir kez başlatmak için kontrol et
+    if (_isLoading && !_isInitializing) {
+      Future.microtask(() {
+        ensureInitialized();
+      });
+    }
   }
 
   // Başlangıç yükleme
   Future<void> _initialize() async {
+    if (_isInitializing) return;
+    _isInitializing = true;
+    
     await _loadGame();
     _isLoading = false;
     notifyListeners();
+    
+    _isInitializing = false;
   }
 
   // Oyunu yükle
