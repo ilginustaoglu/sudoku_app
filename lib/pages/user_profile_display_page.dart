@@ -58,27 +58,12 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
             );
           }
 
-          return Stack(
-            children: [
-              // Cover Image veya Cover Color (arkaplan)
-              Positioned.fill(
-                child: profile.coverImagePath != null && profile.coverImagePath!.isNotEmpty
-                    ? Opacity(
-                        opacity: 0.8, // %80 opaklık
-                        child: _buildCoverImage(profile.coverImagePath!, profile),
-                      )
-                    : Container(
-                        color: profile.coverImageColor != null
-                            ? Color(profile.coverImageColor!)
-                            : Colors.grey.shade300,
-                      ),
-              ),
-              // İçerik
-              SingleChildScrollView(
+          return SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
+                // Üst boşluk (cover yok)
                 const SizedBox(height: 20),
                 
                 // Profil fotoğrafı
@@ -225,10 +210,8 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                   _buildStatistics(_stats!)
                 else
                   const Text('No statistics available'),
-                ],
-              ),
+              ],
             ),
-            ],
           );
         },
       ),
@@ -400,59 +383,4 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
     }
   }
 
-  Widget _buildCoverImage(String imagePath, profile) {
-    // Asset path kontrolü (assets/ ile başlıyorsa)
-    if (imagePath.startsWith('assets/')) {
-      return Image.asset(
-        imagePath,
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-        repeat: ImageRepeat.noRepeat,
-        errorBuilder: (context, error, stackTrace) {
-          // Hata durumunda renk göster
-          debugPrint('Error loading cover image: $error');
-          debugPrint('Image path: $imagePath');
-          return Container(
-            color: profile.coverImageColor != null
-                ? Color(profile.coverImageColor!)
-                : Colors.grey.shade300,
-          );
-        },
-      );
-    } else {
-      // File path ise
-      final file = File(imagePath);
-      return FutureBuilder<bool>(
-        future: file.exists(),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data == true) {
-            return Image.file(
-              file,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              repeat: ImageRepeat.noRepeat,
-              errorBuilder: (context, error, stackTrace) {
-                debugPrint('Error loading cover image file: $error');
-                debugPrint('Image path: $imagePath');
-                return Container(
-                  color: profile.coverImageColor != null
-                      ? Color(profile.coverImageColor!)
-                      : Colors.grey.shade300,
-                );
-              },
-            );
-          } else {
-            // Dosya yoksa renk göster
-            return Container(
-              color: profile.coverImageColor != null
-                  ? Color(profile.coverImageColor!)
-                  : Colors.grey.shade300,
-            );
-          }
-        },
-      );
-    }
-  }
 }
