@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../services/profile_manager.dart';
 import 'register_page.dart';
 
@@ -39,19 +40,28 @@ class _LoginPageState extends State<LoginPage> {
       );
 
       if (mounted) {
-        Navigator.pop(context);
+        if (Navigator.canPop(context)) {
+          Navigator.pop(context);
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Logged in successfully!'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).loggedInSuccess),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(
+              l10n.errorWithMessage(
+                l10n.localizeErrorMessage(
+                  e.toString().replaceFirst('Exception: ', ''),
+                ),
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -67,9 +77,12 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login to Pandoku'),
+        automaticallyImplyLeading: Navigator.canPop(context),
+        title: Text(l10n.loginTitle),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -79,8 +92,6 @@ class _LoginPageState extends State<LoginPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const SizedBox(height: 40),
-              
-              // Logo veya ikon
               Center(
                 child: Container(
                   width: 100,
@@ -96,60 +107,50 @@ class _LoginPageState extends State<LoginPage> {
                   ),
                 ),
               ),
-              
               const SizedBox(height: 40),
-              
-              const Text(
-                'Welcome Back!',
-                style: TextStyle(
+              Text(
+                l10n.welcomeBack,
+                style: const TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.bold,
                 ),
                 textAlign: TextAlign.center,
               ),
-              
               const SizedBox(height: 8),
-              
-              const Text(
-                'Login with your Pandaccount',
-                style: TextStyle(
+              Text(
+                l10n.loginSubtitle,
+                style: const TextStyle(
                   fontSize: 16,
                   color: Colors.grey,
                 ),
                 textAlign: TextAlign.center,
               ),
-              
               const SizedBox(height: 40),
-              
-              // Email
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'Enter your email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: l10n.email,
+                  hintText: l10n.emailHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
+                    return l10n.enterEmail;
                   }
                   if (!value.contains('@')) {
-                    return 'Please enter a valid email';
+                    return l10n.validEmail;
                   }
                   return null;
                 },
               ),
-              
               const SizedBox(height: 16),
-              
-              // Şifre
               TextFormField(
                 controller: _passwordController,
                 decoration: InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
+                  labelText: l10n.password,
+                  hintText: l10n.passwordHint,
                   border: const OutlineInputBorder(),
                   prefixIcon: const Icon(Icons.lock),
                   suffixIcon: IconButton(
@@ -166,15 +167,12 @@ class _LoginPageState extends State<LoginPage> {
                 obscureText: _obscurePassword,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
+                    return l10n.enterPassword;
                   }
                   return null;
                 },
               ),
-              
               const SizedBox(height: 24),
-              
-              // Login butonu
               ElevatedButton(
                 onPressed: _isLoading ? null : _login,
                 style: ElevatedButton.styleFrom(
@@ -191,18 +189,15 @@ class _LoginPageState extends State<LoginPage> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text(
-                        'Login',
-                        style: TextStyle(
+                    : Text(
+                        l10n.login,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
               ),
-              
               const SizedBox(height: 16),
-              
-              // Kayıt sayfasına git
               TextButton(
                 onPressed: () {
                   Navigator.push(
@@ -212,9 +207,9 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   );
                 },
-                child: const Text(
-                  'Don\'t have an account? Create one',
-                  style: TextStyle(
+                child: Text(
+                  l10n.noAccount,
+                  style: const TextStyle(
                     fontSize: 16,
                     color: Color(0xFF2E7D32),
                   ),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
+import '../l10n/app_localizations.dart';
 import '../services/daily_game_manager.dart';
 import '../services/game_state_manager.dart';
 import '../models/sudoku_game.dart';
@@ -33,10 +34,8 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Future<void> _loadDailyGames() async {
-    // Mevcut ayın tüm günlerini yükle
-    final now = DateTime.now();
-    final firstDay = DateTime(now.year, now.month, 1);
-    final lastDay = DateTime(now.year, now.month + 1, 0);
+    final firstDay = DateTime(_focusedDay.year, _focusedDay.month, 1);
+    final lastDay = DateTime(_focusedDay.year, _focusedDay.month + 1, 0);
     
     Map<String, SudokuGame> games = {};
     for (var day = firstDay; day.isBefore(lastDay.add(const Duration(days: 1))); day = day.add(const Duration(days: 1))) {
@@ -124,6 +123,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final dateKey = _getDateKey(_selectedDay);
     final selectedGame = _dailyGames[dateKey];
     final isToday = _isSameDay(_selectedDay, DateTime.now());
@@ -132,7 +132,7 @@ class _CalendarPageState extends State<CalendarPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Daily Sudoku Calendar'),
+        title: Text(l10n.dailyCalendarTitle),
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black),
         elevation: 0,
@@ -178,15 +178,12 @@ class _CalendarPageState extends State<CalendarPage> {
             calendarBuilders: CalendarBuilders(
               markerBuilder: (context, date, events) {
                 if (events.isNotEmpty) {
-                  return Positioned(
-                    bottom: 1,
-                    child: Container(
-                      width: 6,
-                      height: 6,
-                      decoration: const BoxDecoration(
-                        color: Color(0xFF2E7D32),
-                        shape: BoxShape.circle,
-                      ),
+                  return const Positioned(
+                    bottom: 0,
+                    child: Icon(
+                      Icons.star,
+                      size: 16,
+                      color: Color(0xFFFFB300),
                     ),
                   );
                 }
@@ -218,13 +215,13 @@ class _CalendarPageState extends State<CalendarPage> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: Colors.grey),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.lock, color: Colors.grey),
-                          SizedBox(width: 8),
+                          const Icon(Icons.lock, color: Colors.grey),
+                          const SizedBox(width: 8),
                           Text(
-                            'Future Date - Not Available',
+                            l10n.futureDateUnavailable,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -242,13 +239,13 @@ class _CalendarPageState extends State<CalendarPage> {
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: const Color(0xFF2E7D32)),
                       ),
-                      child: const Row(
+                      child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
-                          SizedBox(width: 8),
+                          const Icon(Icons.check_circle, color: Color(0xFF2E7D32)),
+                          const SizedBox(width: 8),
                           Text(
-                            'Completed',
+                            l10n.completed,
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -280,7 +277,7 @@ class _CalendarPageState extends State<CalendarPage> {
                             const Icon(Icons.play_arrow, size: 24),
                             const SizedBox(width: 12),
                             Text(
-                              isToday ? 'Play Today\'s Game' : 'Play This Day\'s Game',
+                              isToday ? l10n.playTodaysGame : l10n.playDaysGame,
                               style: const TextStyle(
                                 fontSize: 20,
                                 fontWeight: FontWeight.bold,
@@ -293,7 +290,7 @@ class _CalendarPageState extends State<CalendarPage> {
                   if (selectedGame != null && !isCompleted) ...[
                     const SizedBox(height: 16),
                     Text(
-                      'Difficulty: ${selectedGame.difficulty}',
+                      l10n.difficultyLabel(selectedGame.difficulty),
                       style: const TextStyle(
                         fontSize: 16,
                         color: Color(0xFF6F4E37),

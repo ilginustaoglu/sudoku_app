@@ -6,15 +6,25 @@ import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:crypto/crypto.dart';
+import '../config/app_config.dart';
 import '../models/user_profile.dart';
 import '../models/game_score.dart';
+import '../models/profile_stats.dart';
+import 'onboarding_manager.dart';
 import 'email_verification_service.dart';
+import 'supabase_profile_repository.dart';
 
 class ProfileManager extends ChangeNotifier {
   static const String _dbName = 'sudoku_profiles.db';
   static const int _dbVersion = 7; // Version artırıldı - coverImageColor kolonu eklendi
-  
+  static const String _migrationPrefKey = 'sqlite_migrated_to_supabase_v1';
+
   final EmailVerificationService _emailService = EmailVerificationService();
+  final SupabaseProfileRepository _supabaseRepo = SupabaseProfileRepository();
+  bool _migrationComplete = false;
+
+  bool get _useSupabase =>
+      AppConfig.isSupabaseConfigured && _migrationComplete;
   
   // Şifre hash'leme
   String _hashPassword(String password) {
@@ -60,7 +70,18 @@ class ProfileManager extends ChangeNotifier {
     _initCompleter = Completer<void>();
     
     try {
-      await _initDatabase();
+      final prefs = await SharedPreferences.getInstance();
+      _migrationComplete = prefs.getBool(_migrationPrefKey) ?? false;
+
+      final needsSqlite = !AppConfig.isSupabaseConfigured || !_migrationComplete;
+      if (needsSqlite) {
+        await _initDatabase();
+      }
+
+      if (AppConfig.isSupabaseConfigured && !_migrationComplete) {
+        await _migrateSqliteToSupabaseIfNeeded();
+      }
+
       await _loadCurrentProfile();
       _isInitialized = true;
       debugPrint('ProfileManager initialized successfully');
@@ -73,8 +94,11 @@ class ProfileManager extends ChangeNotifier {
     } catch (e) {
       debugPrint('Error initializing ProfileManager: $e');
       debugPrint('Stack trace: ${StackTrace.current}');
-      _isInitialized = false;
-      // Hata durumunda bile completer'ı tamamla ki sonsuz beklemeye düşmesin
+      // Hata olsa bile UI'ın açılmasına izin ver (login ekranı)
+      _isInitialized = true;
+      _currentProfile = null;
+      _isGuestMode = true;
+      notifyListeners();
       if (!_initCompleter!.isCompleted) {
         _initCompleter!.complete();
       }
@@ -85,22 +109,50 @@ class ProfileManager extends ChangeNotifier {
 
   // Database hazır olana kadar bekle
   Future<void> ensureInitialized() async {
-    if (_isInitialized && _database != null) return;
-    
+    if (_isInitialized && (_useSupabase || _database != null)) return;
+
     // Eğer henüz başlatılmadıysa başlat
     if (!_isInitializing && !_isInitialized) {
       await _initialize();
       return;
     }
-    
+
     // Completer varsa bekle
     if (_initCompleter != null) {
       await _initCompleter!.future;
     }
-    
+
     // Eğer hala initialize olmadıysa tekrar dene
-    if (!_isInitialized || _database == null) {
+    if (!_isInitialized || (!_useSupabase && _database == null)) {
       throw Exception('Database initialization failed');
+    }
+  }
+
+  /// SQLite'taki mevcut profil ve skorları Supabase'e taşır (tek seferlik).
+  Future<void> _migrateSqliteToSupabaseIfNeeded() async {
+    if (!AppConfig.isSupabaseConfigured || _database == null) return;
+
+    try {
+      final profiles = await _database!.query('profiles');
+      final scores = await _database!.query('game_scores');
+
+      await _supabaseRepo
+          .upsertProfilesFromSqlite(profiles)
+          .timeout(const Duration(seconds: 20));
+      await _supabaseRepo
+          .upsertScoresFromSqlite(scores)
+          .timeout(const Duration(seconds: 20));
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_migrationPrefKey, true);
+      _migrationComplete = true;
+
+      debugPrint(
+        'SQLite → Supabase migration completed: '
+        '${profiles.length} profiles, ${scores.length} scores',
+      );
+    } catch (e) {
+      debugPrint('SQLite → Supabase migration failed: $e');
     }
   }
 
@@ -114,12 +166,33 @@ class ProfileManager extends ChangeNotifier {
 
   // Veritabanı istatistiklerini al
   Future<Map<String, dynamic>> getDatabaseStats() async {
+    if (_useSupabase) {
+      try {
+        return await _supabaseRepo.getStats();
+      } catch (e) {
+        debugPrint('Error getting Supabase stats: $e');
+        return {
+          'profilesCount': 0,
+          'scoresCount': 0,
+          'databasePath': AppConfig.supabaseUrl,
+          'storageType': 'supabase',
+          'migrationComplete': _migrationComplete,
+          'usingSupabase': _useSupabase,
+        };
+      }
+    }
+
     if (_database == null) {
       final dbPath = await getDatabasePath();
       return {
         'profilesCount': 0,
         'scoresCount': 0,
         'databasePath': dbPath,
+        'storageType': 'sqlite',
+        'migrationComplete': _migrationComplete,
+        'usingSupabase': _useSupabase,
+        'localSqliteProfiles': 0,
+        'localSqliteScores': 0,
       };
     }
 
@@ -138,6 +211,11 @@ class ProfileManager extends ChangeNotifier {
         'profilesCount': profilesCount,
         'scoresCount': scoresCount,
         'databasePath': dbPath,
+        'storageType': 'sqlite',
+        'migrationComplete': _migrationComplete,
+        'usingSupabase': _useSupabase,
+        'localSqliteProfiles': profilesCount,
+        'localSqliteScores': scoresCount,
       };
     } catch (e) {
       debugPrint('Error getting database stats: $e');
@@ -146,6 +224,11 @@ class ProfileManager extends ChangeNotifier {
         'profilesCount': 0,
         'scoresCount': 0,
         'databasePath': dbPath,
+        'storageType': 'sqlite',
+        'migrationComplete': _migrationComplete,
+        'usingSupabase': _useSupabase,
+        'localSqliteProfiles': 0,
+        'localSqliteScores': 0,
       };
     }
   }
@@ -469,8 +552,8 @@ class ProfileManager extends ChangeNotifier {
       final isGuest = prefs.getBool('is_guest_mode') ?? true;
 
       if (profileId != null && !isGuest) {
-        _currentProfile = await getProfile(profileId);
-        _isGuestMode = false;
+        _currentProfile = await _fetchProfileById(profileId);
+        _isGuestMode = _currentProfile == null;
       } else {
         _currentProfile = null;
         _isGuestMode = true;
@@ -495,6 +578,12 @@ class ProfileManager extends ChangeNotifier {
 
   // Email ile profil getir
   Future<UserProfile?> getProfileByEmail(String email) async {
+    await ensureInitialized();
+
+    if (_useSupabase) {
+      return _supabaseRepo.getProfileByEmail(email);
+    }
+
     if (_database == null) return null;
 
     final List<Map<String, dynamic>> maps = await _database!.query(
@@ -508,8 +597,12 @@ class ProfileManager extends ChangeNotifier {
     return _mapToProfile(maps[0]);
   }
 
-  // Profil getir (ID ile)
-  Future<UserProfile?> getProfile(String profileId) async {
+  // Profil getir (ID ile) — init sırasında deadlock olmaması için ayrı helper
+  Future<UserProfile?> _fetchProfileById(String profileId) async {
+    if (_useSupabase) {
+      return _supabaseRepo.getProfile(profileId);
+    }
+
     if (_database == null) return null;
 
     final List<Map<String, dynamic>> maps = await _database!.query(
@@ -521,6 +614,12 @@ class ProfileManager extends ChangeNotifier {
     if (maps.isEmpty) return null;
 
     return _mapToProfile(maps[0]);
+  }
+
+  // Profil getir (ID ile)
+  Future<UserProfile?> getProfile(String profileId) async {
+    await ensureInitialized();
+    return _fetchProfileById(profileId);
   }
 
   // Veritabanı map'ini UserProfile'a çevir
@@ -577,7 +676,7 @@ class ProfileManager extends ChangeNotifier {
     int? avatarColor,
   }) async {
     await ensureInitialized();
-    if (_database == null) {
+    if (!_useSupabase && _database == null) {
       throw Exception('Database not initialized');
     }
 
@@ -615,17 +714,22 @@ class ProfileManager extends ChangeNotifier {
       passwordHash: passwordHash,
     );
 
-    await _database!.insert(
-      'profiles',
-      {
-        ...profile.toJson(),
-        'emailVerified': 1, // SQLite boolean için 1/0
-      },
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    if (_useSupabase) {
+      await _supabaseRepo.insertProfile(profile);
+    } else {
+      await _database!.insert(
+        'profiles',
+        {
+          ...profile.toJson(),
+          'emailVerified': 1, // SQLite boolean için 1/0
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
 
     // Profili aktif yap
     await login(email, password);
+    await OnboardingManager.scheduleHomeGuide();
 
     return profile;
   }
@@ -633,7 +737,7 @@ class ProfileManager extends ChangeNotifier {
   // Email ve şifre ile giriş yap
   Future<UserProfile> login(String email, String password) async {
     await ensureInitialized();
-    if (_database == null) {
+    if (!_useSupabase && _database == null) {
       throw Exception('Database not initialized');
     }
 
@@ -665,20 +769,25 @@ class ProfileManager extends ChangeNotifier {
 
   // Profil sil
   Future<void> deleteProfile(String profileId) async {
-    if (_database == null) return;
+    await ensureInitialized();
 
-    await _database!.delete(
-      'profiles',
-      where: 'id = ?',
-      whereArgs: [profileId],
-    );
+    if (_useSupabase) {
+      await _supabaseRepo.deleteProfile(profileId);
+    } else {
+      if (_database == null) return;
 
-    // Skorları da sil
-    await _database!.delete(
-      'game_scores',
-      where: 'profileId = ?',
-      whereArgs: [profileId],
-    );
+      await _database!.delete(
+        'profiles',
+        where: 'id = ?',
+        whereArgs: [profileId],
+      );
+
+      await _database!.delete(
+        'game_scores',
+        where: 'profileId = ?',
+        whereArgs: [profileId],
+      );
+    }
 
     if (_currentProfile?.id == profileId) {
       _currentProfile = null;
@@ -690,17 +799,23 @@ class ProfileManager extends ChangeNotifier {
 
   // Profil güncelle
   Future<void> updateProfile(UserProfile profile) async {
-    if (_database == null) return;
+    await ensureInitialized();
 
-    await _database!.update(
-      'profiles',
-      {
-        ...profile.toJson(),
-        'emailVerified': profile.emailVerified ? 1 : 0,
-      },
-      where: 'id = ?',
-      whereArgs: [profile.id],
-    );
+    if (_useSupabase) {
+      await _supabaseRepo.updateProfile(profile);
+    } else {
+      if (_database == null) return;
+
+      await _database!.update(
+        'profiles',
+        {
+          ...profile.toJson(),
+          'emailVerified': profile.emailVerified ? 1 : 0,
+        },
+        where: 'id = ?',
+        whereArgs: [profile.id],
+      );
+    }
 
     if (_currentProfile?.id == profile.id) {
       _currentProfile = profile;
@@ -710,37 +825,65 @@ class ProfileManager extends ChangeNotifier {
 
   // Son oynama zamanını güncelle
   Future<void> updateLastPlayed(String profileId) async {
-    if (_database == null) return;
+    await ensureInitialized();
+    final now = DateTime.now();
 
-    await _database!.update(
-      'profiles',
-      {'lastPlayedAt': DateTime.now().toIso8601String()},
-      where: 'id = ?',
-      whereArgs: [profileId],
-    );
+    if (_useSupabase) {
+      await _supabaseRepo.updateLastPlayed(profileId, now);
+    } else {
+      if (_database == null) return;
+
+      await _database!.update(
+        'profiles',
+        {'lastPlayedAt': now.toIso8601String()},
+        where: 'id = ?',
+        whereArgs: [profileId],
+      );
+    }
 
     if (_currentProfile?.id == profileId) {
-      _currentProfile = _currentProfile!.copyWith(lastPlayedAt: DateTime.now());
+      _currentProfile = _currentProfile!.copyWith(lastPlayedAt: now);
       notifyListeners();
     }
   }
 
   // Skor kaydet
   Future<void> saveScore(GameScore score) async {
-    if (_database == null || _isGuestMode || _currentProfile == null) return;
+    if (_isGuestMode || _currentProfile == null) return;
 
-    await _database!.insert(
-      'game_scores',
-      score.toJson(),
-      conflictAlgorithm: ConflictAlgorithm.replace,
-    );
+    await ensureInitialized();
 
-    // Son oynama zamanını güncelle
-    await updateLastPlayed(_currentProfile!.id);
+    try {
+      if (_useSupabase) {
+        await _supabaseRepo.saveScore(score);
+      } else {
+        if (_database == null) return;
+
+        await _database!.insert(
+          'game_scores',
+          {
+            ...score.toJson(),
+            'isDailyGame': score.isDailyGame ? 1 : 0,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+
+      await updateLastPlayed(_currentProfile!.id);
+    } catch (e) {
+      debugPrint('Error saving score: $e');
+      rethrow;
+    }
   }
 
   // Profil skorlarını getir
   Future<List<GameScore>> getProfileScores(String profileId, {String? difficulty}) async {
+    await ensureInitialized();
+
+    if (_useSupabase) {
+      return _supabaseRepo.getProfileScores(profileId, difficulty: difficulty);
+    }
+
     if (_database == null) return [];
 
     String where = 'profileId = ?';
@@ -771,55 +914,31 @@ class ProfileManager extends ChangeNotifier {
     });
   }
 
-  // Profil istatistiklerini getir
-  Future<Map<String, dynamic>> getProfileStats(String profileId) async {
-    if (_database == null) {
-      return {
-        'totalGames': 0,
-        'totalScore': 0,
-        'bestScore': 0,
-        'averageScore': 0,
-        'totalTime': 0,
-        'easyGames': 0,
-        'mediumGames': 0,
-        'hardGames': 0,
-      };
+  // Mevcut profili veritabanından yenile
+  Future<void> refreshCurrentProfile() async {
+    await ensureInitialized();
+    final profileId = _currentProfile?.id;
+    if (profileId == null || _isGuestMode) return;
+
+    try {
+      final fresh = await _fetchProfileById(profileId);
+      if (fresh != null) {
+        _currentProfile = fresh;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error refreshing profile: $e');
     }
+  }
+
+  // Profil istatistiklerini getir (zorluk bazında ayrılmış)
+  Future<ProfileStats> getProfileStats(String profileId) async {
+    await ensureInitialized();
 
     final scores = await getProfileScores(profileId);
+    if (scores.isEmpty) return ProfileStats.empty();
 
-    if (scores.isEmpty) {
-      return {
-        'totalGames': 0,
-        'totalScore': 0,
-        'bestScore': 0,
-        'averageScore': 0,
-        'totalTime': 0,
-        'easyGames': 0,
-        'mediumGames': 0,
-        'hardGames': 0,
-      };
-    }
-
-    final totalGames = scores.length;
-    final totalScore = scores.fold<int>(0, (sum, score) => sum + score.score);
-    final bestScore = scores.map((s) => s.score).reduce((a, b) => a > b ? a : b);
-    final averageScore = (totalScore / totalGames).round();
-    final totalTime = scores.fold<int>(0, (sum, score) => sum + score.elapsedSeconds);
-    final easyGames = scores.where((s) => s.difficulty == 'Easy').length;
-    final mediumGames = scores.where((s) => s.difficulty == 'Medium').length;
-    final hardGames = scores.where((s) => s.difficulty == 'Hard').length;
-
-    return {
-      'totalGames': totalGames,
-      'totalScore': totalScore,
-      'bestScore': bestScore,
-      'averageScore': averageScore,
-      'totalTime': totalTime,
-      'easyGames': easyGames,
-      'mediumGames': mediumGames,
-      'hardGames': hardGames,
-    };
+    return ProfileStats.fromScores(scores);
   }
 
   // Veritabanını kapat

@@ -4,101 +4,208 @@ import '../services/game_state_manager.dart';
 import '../services/profile_manager.dart';
 import '../services/sudoku_generator.dart';
 import '../services/daily_game_manager.dart';
+import '../services/onboarding_manager.dart';
 import '../models/sudoku_game.dart';
+import '../l10n/app_localizations.dart';
+import '../widgets/spotlight_guide.dart';
 import 'game_page.dart';
 import 'settings_page.dart';
 import 'other_apps_page.dart';
 import 'calendar_page.dart';
-import 'login_page.dart';
-import 'register_page.dart';
 import 'user_profile_display_page.dart';
+import 'feedback_page.dart';
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   final GameStateManager gameStateManager;
 
   const HomePage({super.key, required this.gameStateManager});
 
   @override
+  State<HomePage> createState() => _HomePageState();
+}
+
+class _HomePageState extends State<HomePage> {
+  final _playKey = GlobalKey();
+  final _dailyKey = GlobalKey();
+  final _calendarKey = GlobalKey();
+  final _profileKey = GlobalKey();
+  final _feedbackKey = GlobalKey();
+  final _settingsKey = GlobalKey();
+  bool _guideChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowGuide());
+  }
+
+  Future<void> _maybeShowGuide() async {
+    if (_guideChecked || !mounted) return;
+    _guideChecked = true;
+
+    final shouldShow = await OnboardingManager.shouldShowHomeGuide();
+    if (!shouldShow || !mounted) return;
+
+    await _showHomeGuide(fromOnboarding: true);
+  }
+
+  Future<void> _showHomeGuide({bool fromOnboarding = false}) async {
+    if (!mounted) return;
+
+    final l10n = AppLocalizations.of(context);
+    await Future.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+
+    await SpotlightGuide.show(
+      context,
+      skipLabel: l10n.guideSkip,
+      nextLabel: l10n.guideNext,
+      doneLabel: l10n.guideDone,
+      onFinished: fromOnboarding ? OnboardingManager.completeHomeGuide : () {},
+      steps: [
+        SpotlightGuideStep(
+          targetKey: _playKey,
+          title: l10n.guidePlayTitle,
+          description: l10n.guidePlayDesc,
+        ),
+        SpotlightGuideStep(
+          targetKey: _dailyKey,
+          title: l10n.guideDailyTitle,
+          description: l10n.guideDailyDesc,
+        ),
+        SpotlightGuideStep(
+          targetKey: _calendarKey,
+          title: l10n.guideCalendarTitle,
+          description: l10n.guideCalendarDesc,
+        ),
+        SpotlightGuideStep(
+          targetKey: _profileKey,
+          title: l10n.guideProfileTitle,
+          description: l10n.guideProfileDesc,
+        ),
+        SpotlightGuideStep(
+          targetKey: _feedbackKey,
+          title: l10n.guideFeedbackTitle,
+          description: l10n.guideFeedbackDesc,
+        ),
+        SpotlightGuideStep(
+          targetKey: _settingsKey,
+          title: l10n.guideSettingsTitle,
+          description: l10n.guideSettingsDesc,
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         elevation: 0,
         backgroundColor: Colors.white,
+        automaticallyImplyLeading: false,
         iconTheme: const IconThemeData(
           color: Colors.black,
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
-          onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => CalendarPage(
-                  gameStateManager: gameStateManager,
-                ),
-              ),
-            );
-          },
-        ),
-        actions: [
-          // Profil butonu (sadece giriş yapılmışsa göster)
-          Consumer<ProfileManager>(
-            builder: (context, profileManager, child) {
-              // Sadece profil durumu değiştiğinde rebuild et
-              if (!profileManager.isGuestMode && profileManager.currentProfile != null) {
-                final avatarColor = profileManager.currentProfile?.avatarColor;
-                return GestureDetector(
-                  onTap: () {
-                    // Profil sayfasına git
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const UserProfileDisplayPage(),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                    child: CircleAvatar(
-                      radius: 18,
-                      backgroundColor: avatarColor != null
-                          ? Color(avatarColor)
-                          : Colors.grey.shade300,
-                      child: const Icon(
-                        Icons.person,
-                        color: Colors.white,
-                        size: 20,
+        leadingWidth: 220,
+        leading: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Consumer<ProfileManager>(
+              builder: (context, profileManager, child) {
+                if (!profileManager.isGuestMode &&
+                    profileManager.currentProfile != null) {
+                  final avatarColor =
+                      profileManager.currentProfile?.avatarColor;
+                  return GestureDetector(
+                    key: _profileKey,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) =>
+                              const UserProfileDisplayPage(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: CircleAvatar(
+                        radius: 18,
+                        backgroundColor: avatarColor != null
+                            ? Color(avatarColor)
+                            : Colors.grey.shade300,
+                        child: const Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-          // Bambu ikonu - Diğer uygulamalar
-          IconButton(
-            icon: Image.asset(
-              'assets/images/bamboo.png',
-              width: 24,
-              height: 24,
-              errorBuilder: (context, error, stackTrace) {
-                return const Icon(Icons.eco, color: Color(0xFF2E7D32)); // Koyu yeşil
+                  );
+                }
+                return SizedBox(key: _profileKey, width: 0, height: 0);
               },
             ),
+            IconButton(
+              key: _feedbackKey,
+              icon: const Icon(Icons.mail_outline, color: Color(0xFF2E7D32)),
+              tooltip: l10n.sendFeedback,
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const FeedbackPage(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: Image.asset(
+                'assets/images/bamboo.png',
+                width: 24,
+                height: 24,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(Icons.eco, color: Color(0xFF2E7D32));
+                },
+              ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const OtherAppsPage(),
+                  ),
+                );
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.help_outline, color: Color(0xFF2E7D32)),
+              tooltip: l10n.showGuide,
+              onPressed: () => _showHomeGuide(),
+            ),
+          ],
+        ),
+        actions: [
+          IconButton(
+            key: _calendarKey,
+            icon: const Icon(Icons.calendar_today, color: Color(0xFF2E7D32)),
             onPressed: () {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => const OtherAppsPage(),
+                  builder: (context) => CalendarPage(
+                    gameStateManager: widget.gameStateManager,
+                  ),
                 ),
               );
             },
           ),
-          // Ayarlar çarkı (koyu yeşil)
           IconButton(
-            icon: const Icon(Icons.settings, color: Color(0xFF2E7D32)), // Koyu yeşil
+            key: _settingsKey,
+            icon: const Icon(Icons.settings, color: Color(0xFF2E7D32)),
             onPressed: () {
               Navigator.push(
                 context,
@@ -119,8 +226,6 @@ class HomePage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 const Spacer(flex: 2),
-                
-                // Logo
                 Container(
                   width: 120,
                   height: 120,
@@ -141,10 +246,9 @@ class HomePage extends StatelessWidget {
                       height: 120,
                       fit: BoxFit.cover,
                       errorBuilder: (context, error, stackTrace) {
-                        // Logo yoksa geçici ikon göster
                         return Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF6F4E37), // Kahve rengi
+                          decoration: const BoxDecoration(
+                            color: Color(0xFF6F4E37),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -157,44 +261,37 @@ class HomePage extends StatelessWidget {
                     ),
                   ),
                 ),
-                
                 const SizedBox(height: 24),
-                
-                // Uygulama Adı
-                const Text(
-                  'Pandoku',
-                  style: TextStyle(
+                Text(
+                  l10n.appName,
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF6F4E37), // Kahve rengi
+                    color: Colors.black,
                     letterSpacing: 1.2,
                   ),
                 ),
-                
                 const Spacer(flex: 3),
-                
-                // Oyun durumuna göre butonlar
                 Consumer<GameStateManager>(
                   builder: (context, manager, child) {
-                    // Initialization constructor'da başlatılıyor (non-blocking)
                     if (manager.isLoading) {
                       return const CircularProgressIndicator();
                     }
                     if (manager.hasOngoingGame) {
-                      // Devam eden oyun varsa Continue ve New Game
                       return Column(
+                        key: _playKey,
                         children: [
                           _buildButton(
                             context,
-                            'Continue',
+                            l10n.continueGame,
                             Icons.play_arrow,
-                            const Color(0xFF2E7D32), // Koyu yeşil
+                            const Color(0xFF2E7D32),
                             () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (context) => GamePage(
-                                    gameStateManager: gameStateManager,
+                                    gameStateManager: widget.gameStateManager,
                                   ),
                                 ),
                               );
@@ -203,98 +300,75 @@ class HomePage extends StatelessWidget {
                           const SizedBox(height: 16),
                           _buildButton(
                             context,
-                            'New Game',
+                            l10n.newGame,
                             Icons.refresh,
-                            const Color(0xFF2E7D32), // Koyu yeşil
+                            const Color(0xFF2E7D32),
                             () {
                               _showDifficultyDialog(context);
                             },
                           ),
                         ],
                       );
-                    } else {
-                      // Yeni oyun için Play
-                      return _buildButton(
+                    }
+                    return KeyedSubtree(
+                      key: _playKey,
+                      child: _buildButton(
                         context,
-                        'Play',
+                        l10n.play,
                         Icons.play_arrow,
-                        const Color(0xFF2E7D32), // Koyu yeşil
+                        const Color(0xFF2E7D32),
                         () {
                           _showDifficultyDialog(context);
                         },
-                      );
-                    }
+                      ),
+                    );
                   },
                 ),
-                
                 const SizedBox(height: 16),
-                
-                // Bugünün Oyunu butonu
+                KeyedSubtree(
+                  key: _dailyKey,
+                  child: _buildButton(
+                    context,
+                    l10n.todaysGame,
+                    Icons.today,
+                    const Color(0xFF6F4E37),
+                    () async {
+                      final dailyGameManager = DailyGameManager();
+                      final today = DateTime.now();
+                      final game = await dailyGameManager.getDailyGame(today);
+                      widget.gameStateManager.startNewGame(game);
+                      if (context.mounted) {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => GamePage(
+                              gameStateManager: widget.gameStateManager,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(height: 16),
                 _buildButton(
                   context,
-                  'Today\'s Game',
-                  Icons.today,
-                  const Color(0xFF6F4E37), // Kahve rengi
+                  l10n.logout,
+                  Icons.logout,
+                  Colors.red.shade300,
                   () async {
-                    final dailyGameManager = DailyGameManager();
-                    final today = DateTime.now();
-                    final game = await dailyGameManager.getDailyGame(today);
-                    gameStateManager.startNewGame(game);
+                    final profileManager =
+                        Provider.of<ProfileManager>(context, listen: false);
+                    await profileManager.logout();
                     if (context.mounted) {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => GamePage(
-                            gameStateManager: gameStateManager,
-                          ),
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(l10n.loggedOutSuccess),
                         ),
                       );
                     }
                   },
                 ),
-                
-                const SizedBox(height: 16),
-                
-                // Pandaccount butonu
-                Consumer<ProfileManager>(
-                  builder: (context, profileManager, child) {
-                    if (profileManager.isGuestMode) {
-                      return _buildButton(
-                        context,
-                        'Enter/Create via Pandaccount',
-                        Icons.account_circle,
-                        const Color(0xFF6F4E37), // Kahve rengi
-                        () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const LoginPage(),
-                            ),
-                          );
-                        },
-                      );
-                    } else {
-                      // Profil varsa sadece çıkış butonu göster
-                      return _buildButton(
-                        context,
-                        'Logout',
-                        Icons.logout,
-                        Colors.red.shade300,
-                        () async {
-                          await profileManager.logout();
-                          if (context.mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Logged out successfully'),
-                              ),
-                            );
-                          }
-                        },
-                      );
-                    }
-                  },
-                ),
-                
                 const Spacer(flex: 2),
               ],
             ),
@@ -343,31 +417,33 @@ class HomePage extends StatelessWidget {
   }
 
   void _showDifficultyDialog(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Select Difficulty Level'),
+          title: Text(l10n.selectDifficulty),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildDifficultyOption(
                 dialogContext,
-                'Easy',
-                const Color(0xFF2E7D32), // Koyu yeşil
+                l10n.easy,
+                const Color(0xFF2E7D32),
                 () => _startNewGame(context, dialogContext, 'Easy'),
               ),
               const SizedBox(height: 12),
               _buildDifficultyOption(
                 dialogContext,
-                'Medium',
+                l10n.medium,
                 Colors.orange,
                 () => _startNewGame(context, dialogContext, 'Medium'),
               ),
               const SizedBox(height: 12),
               _buildDifficultyOption(
                 dialogContext,
-                'Hard',
+                l10n.hard,
                 Colors.red,
                 () => _startNewGame(context, dialogContext, 'Hard'),
               ),
@@ -412,21 +488,18 @@ class HomePage extends StatelessWidget {
     BuildContext dialogContext,
     String difficulty,
   ) {
-    Navigator.pop(dialogContext); // Dialog'u kapat
+    Navigator.pop(dialogContext);
 
-    // Yeni oyun oluştur
     SudokuGame newGame = SudokuGenerator.generateNewGame(difficulty: difficulty);
-    gameStateManager.startNewGame(newGame);
+    widget.gameStateManager.startNewGame(newGame);
 
-    // Oyun sayfasına git
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => GamePage(
-          gameStateManager: gameStateManager,
+          gameStateManager: widget.gameStateManager,
         ),
       ),
     );
   }
 }
-

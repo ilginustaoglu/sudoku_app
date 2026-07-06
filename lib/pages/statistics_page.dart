@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../l10n/app_localizations.dart';
 import '../services/statistics_manager.dart';
 
 class StatisticsPage extends StatefulWidget {
@@ -41,9 +42,10 @@ class _StatisticsPageState extends State<StatisticsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Statistics'),
+        title: Text(l10n.statistics),
         backgroundColor: Colors.white,
         iconTheme: const IconThemeData(color: Colors.black),
         elevation: 0,
@@ -60,7 +62,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     children: [
                       Expanded(
                         child: _buildStatCard(
-                          'Yearly',
+                          l10n.statYearly,
                           _yearlyCompleted.toString(),
                           Icons.calendar_today,
                           const Color(0xFF2E7D32),
@@ -69,7 +71,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: _buildStatCard(
-                          'Monthly',
+                          l10n.statMonthly,
                           _monthlyCompleted.toString(),
                           Icons.calendar_month,
                           const Color(0xFF6F4E37),
@@ -82,7 +84,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                     children: [
                       Expanded(
                         child: _buildStatCard(
-                          'Weekly',
+                          l10n.statWeekly,
                           _weeklyCompleted.toString(),
                           Icons.date_range,
                           Colors.orange,
@@ -92,9 +94,9 @@ class _StatisticsPageState extends State<StatisticsPage> {
                   ),
                   const SizedBox(height: 24),
                   // Haftalık grafik
-                  const Text(
-                    'Weekly Completed Games',
-                    style: TextStyle(
+                  Text(
+                    l10n.weeklyCompletedGames,
+                    style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFF6F4E37),
@@ -150,7 +152,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
                               showTitles: true,
                               reservedSize: 30,
                               getTitlesWidget: (value, meta) {
-                                const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                final days = l10n.weekdayShortLabels;
                                 if (value.toInt() >= 0 && value.toInt() < 7) {
                                   return Text(
                                     days[value.toInt()],

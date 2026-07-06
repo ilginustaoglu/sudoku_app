@@ -6,10 +6,10 @@ import '../services/game_state_manager.dart';
 import '../services/profile_manager.dart';
 import '../services/sound_manager.dart';
 import '../services/highlight_color_manager.dart';
-import '../services/profile_visibility_manager.dart';
 import '../models/sudoku_game.dart';
 import '../models/game_score.dart';
 import '../services/sudoku_generator.dart';
+import '../l10n/app_localizations.dart';
 
 class GamePage extends StatefulWidget {
   final GameStateManager gameStateManager;
@@ -383,6 +383,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   Widget _buildScoreContainer() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
@@ -393,7 +394,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       child: Column(
         children: [
           Text(
-            'Score',
+            l10n.gameScore,
             style: TextStyle(
               fontSize: 12,
               color: const Color(0xFF2E7D32),
@@ -415,6 +416,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   Widget _buildErrorContainer() {
+    final l10n = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       decoration: BoxDecoration(
@@ -425,7 +427,7 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       child: Column(
         children: [
           Text(
-            'Error',
+            l10n.gameError,
             style: TextStyle(
               fontSize: 12,
               color: Colors.orange.shade700,
@@ -798,26 +800,30 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       isDailyGame: isDailyGame,
     );
 
-    await profileManager.saveScore(score);
+    try {
+      await profileManager.saveScore(score);
+    } catch (e) {
+      debugPrint('Error saving game score: $e');
+    }
   }
 
   void _showCompletionDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Congratulations!'),
-          content: Text('You have successfully completed the Sudoku!\n\nScore: ${game.score}'),
+          title: Text(l10n.gameCongratulations),
+          content: Text(l10n.gameCompletionMessage(game.score)),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Dialog'u kapat
-                // Tamamlanmış oyunu temizle
+                Navigator.pop(context);
                 widget.gameStateManager.clearGame();
-                Navigator.pop(context); // Oyun sayfasından çık
+                Navigator.pop(context);
               },
-              child: const Text('Back to Home'),
+              child: Text(l10n.backToHome),
             ),
           ],
         );
@@ -826,22 +832,22 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
   }
 
   void _showGameOverDialog() {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Game Over'),
-          content: const Text('You made 3 errors. Game lost!'),
+          title: Text(l10n.gameOver),
+          content: Text(l10n.gameOverMessage),
           actions: [
             TextButton(
               onPressed: () {
-                Navigator.pop(context); // Dialog'u kapat
-                // Oyunu temizle
+                Navigator.pop(context);
                 widget.gameStateManager.clearGame();
-                Navigator.pop(context); // Oyun sayfasından çık
+                Navigator.pop(context);
               },
-              child: const Text('Back to Home'),
+              child: Text(l10n.backToHome),
             ),
           ],
         );
@@ -855,100 +861,37 @@ class _GamePageState extends State<GamePage> with TickerProviderStateMixin {
       builder: (context, highlightColorManager, child) {
         return Scaffold(
           appBar: AppBar(
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('Sudoku'),
-            const SizedBox(width: 8),
-            Consumer<ProfileManager>(
-              builder: (context, profileManager, child) {
-                if (profileManager.isGuestMode || profileManager.currentProfile == null) {
-                  return const SizedBox.shrink();
-                }
-                
-                final profile = profileManager.currentProfile!;
-                return Consumer<ProfileVisibilityManager>(
-                  builder: (context, visibilityManager, child) {
-                    String displayText;
-                    
-                    // Eğer tüm bilgiler gizliyse "no name user" göster
-                    if (visibilityManager.isAllInfoHidden) {
-                      displayText = 'no name user';
-                    } else if (profile.displayName != null && profile.displayName!.isNotEmpty) {
-                      // Display name varsa onu göster
-                      displayText = profile.displayName!;
-                    } else if (visibilityManager.showName) {
-                      // İsim gösteriliyorsa fullName göster
-                      displayText = profile.fullName;
-                    } else {
-                      // Hiçbiri gösterilmiyorsa "no name user"
-                      displayText = 'no name user';
-                    }
-                    
-                    return Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
+            actions: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                child: Center(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.timer,
+                        size: 20,
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white
+                            : Colors.black,
                       ),
-                      child: Text(
-                        displayText,
+                      const SizedBox(width: 6),
+                      Text(
+                        _formatDuration(_elapsedTime),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 18,
                           fontWeight: FontWeight.bold,
                           color: Theme.of(context).brightness == Brightness.dark
                               ? Colors.white
-                              : Colors.black87,
+                              : Colors.black,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-          ],
-        ),
-        centerTitle: false,
-        actions: [
-          // Zaman Sayacı
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.timer,
-                    size: 20,
-                    color: Theme.of(context).brightness == Brightness.dark
-                        ? Colors.white
-                        : Colors.black,
+                    ],
                   ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _formatDuration(_elapsedTime),
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Theme.of(context).brightness == Brightness.dark
-                          ? Colors.white
-                          : Colors.black,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.home),
-            onPressed: () {
-              _stopTimerAndSave();
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
       body: OrientationBuilder(
         builder: (context, orientation) {
           final isLandscape = orientation == Orientation.landscape;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../l10n/app_localizations.dart';
 import '../services/profile_manager.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -24,6 +25,7 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isCodeVerified = false;
   bool _isLoading = false;
   bool _isVerifyingCode = false;
+  bool _showBirthDateError = false;
 
   final List<Color> _colorOptions = [
     Colors.blue,
@@ -56,31 +58,34 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _selectBirthDate() async {
+    final l10n = AppLocalizations.of(context);
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: DateTime.now().subtract(const Duration(days: 365 * 18)),
       firstDate: DateTime(1900),
       lastDate: DateTime.now(),
-      helpText: 'Select Birth Date',
+      helpText: l10n.selectBirthDateHelp,
     );
     if (picked != null) {
       setState(() {
         _selectedBirthDate = picked;
+        _showBirthDateError = false;
       });
     }
   }
 
   Future<void> _sendVerificationCode() async {
+    final l10n = AppLocalizations.of(context);
     final email = _emailController.text.trim();
     if (email.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your email address')),
+        SnackBar(content: Text(l10n.enterEmailAddress)),
       );
       return;
     }
     if (!email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email address')),
+        SnackBar(content: Text(l10n.enterValidEmail)),
       );
       return;
     }
@@ -106,9 +111,16 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(
+              l10n.errorWithMessage(
+                l10n.localizeErrorMessage(
+                  e.toString().replaceFirst('Exception: ', ''),
+                ),
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -123,10 +135,11 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _verifyCode() async {
+    final l10n = AppLocalizations.of(context);
     if (_verificationCodeController.text.trim().length != 6) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter a 6-digit code'),
+        SnackBar(
+          content: Text(l10n.enterSixDigitCodeShort),
           backgroundColor: Colors.red,
         ),
       );
@@ -150,8 +163,8 @@ class _RegisterPageState extends State<RegisterPage> {
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Code verified successfully!'),
+            SnackBar(
+              content: Text(l10n.codeVerified),
               backgroundColor: Colors.green,
             ),
           );
@@ -159,8 +172,8 @@ class _RegisterPageState extends State<RegisterPage> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Invalid verification code'),
+            SnackBar(
+              content: Text(l10n.invalidCode),
               backgroundColor: Colors.red,
             ),
           );
@@ -168,9 +181,16 @@ class _RegisterPageState extends State<RegisterPage> {
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(
+              l10n.errorWithMessage(
+                l10n.localizeErrorMessage(
+                  e.toString().replaceFirst('Exception: ', ''),
+                ),
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -185,17 +205,39 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _register() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedBirthDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your birth date')),
-      );
-      return;
+    final l10n = AppLocalizations.of(context);
+    final issues = <String>[];
+
+    final formValid = _formKey.currentState!.validate();
+    if (!formValid) {
+      issues.add(l10n.fillRequiredFields);
     }
-    if (!_isCodeVerified) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please verify your email code first')),
-      );
+
+    if (_selectedBirthDate == null) {
+      issues.add(l10n.selectBirthDateError);
+      setState(() => _showBirthDateError = true);
+    }
+
+    if (!_isVerificationSent) {
+      issues.add(l10n.sendCodeFirst);
+    } else if (!_isCodeVerified) {
+      if (_verificationCodeController.text.trim().length != 6) {
+        issues.add(l10n.enterSixDigitCode);
+      } else {
+        issues.add(l10n.verifyCodeFirst);
+      }
+    }
+
+    if (issues.isNotEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(issues.join('\n')),
+            backgroundColor: Colors.red.shade700,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
       return;
     }
 
@@ -218,17 +260,22 @@ class _RegisterPageState extends State<RegisterPage> {
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account created successfully!'),
+          SnackBar(
+            content: Text(l10n.accountCreated),
             backgroundColor: Colors.green,
           ),
         );
       }
     } catch (e) {
       if (mounted) {
+        final l10n = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
+            content: Text(
+              l10n.localizeErrorMessage(
+                e.toString().replaceFirst('Exception: ', ''),
+              ),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -243,18 +290,19 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   void _showVerificationCodeDialog(String code) {
+    final l10n = AppLocalizations.of(context);
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Verification Code'),
+          title: Text(l10n.verificationCodeTitle),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                'Your verification code is:',
-                style: TextStyle(fontSize: 16),
+              Text(
+                l10n.yourVerificationCode,
+                style: const TextStyle(fontSize: 16),
               ),
               const SizedBox(height: 16),
               Container(
@@ -278,7 +326,7 @@ class _RegisterPageState extends State<RegisterPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(l10n.ok),
             ),
           ],
         );
@@ -288,9 +336,11 @@ class _RegisterPageState extends State<RegisterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Create Pandaccount'),
+        title: Text(l10n.createAccount),
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24.0),
@@ -330,19 +380,19 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 40),
               TextFormField(
                 controller: _emailController,
-                decoration: const InputDecoration(
-                  labelText: 'Email',
-                  hintText: 'Enter your email',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.email),
+                decoration: InputDecoration(
+                  labelText: l10n.email,
+                  hintText: l10n.emailHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.email),
                 ),
                 keyboardType: TextInputType.emailAddress,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your email';
+                    return l10n.enterEmail;
                   }
                   if (!value.contains('@')) {
-                    return 'Please enter a valid email';
+                    return l10n.validEmail;
                   }
                   return null;
                 },
@@ -363,7 +413,7 @@ class _RegisterPageState extends State<RegisterPage> {
                           width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Send Verification Code'),
+                      : Text(l10n.sendVerificationCode),
                 ),
               if (_isVerificationSent) ...[
                 const SizedBox(height: 16),
@@ -373,8 +423,8 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: TextFormField(
                         controller: _verificationCodeController,
                         decoration: InputDecoration(
-                          labelText: 'Verification Code',
-                          hintText: 'Enter verification code',
+                          labelText: l10n.verificationCode,
+                          hintText: l10n.verificationCodeHint,
                           border: const OutlineInputBorder(),
                           prefixIcon: const Icon(Icons.lock),
                           suffixIcon: _isCodeVerified
@@ -387,10 +437,10 @@ class _RegisterPageState extends State<RegisterPage> {
                         validator: (value) {
                           if (!_isCodeVerified) {
                             if (value == null || value.isEmpty) {
-                              return 'Please verify code';
+                              return l10n.verifyCodeRequired;
                             }
                             if (value.length != 6) {
-                              return 'Code must be 6 digits';
+                              return l10n.codeSixDigits;
                             }
                           }
                           return null;
@@ -409,7 +459,6 @@ class _RegisterPageState extends State<RegisterPage> {
                               )
                             : const Icon(Icons.check_circle_outline),
                         color: const Color(0xFF2E7D32),
-                        tooltip: 'Verify Code',
                       ),
                     ],
                   ],
@@ -417,21 +466,21 @@ class _RegisterPageState extends State<RegisterPage> {
                 const SizedBox(height: 8),
                 TextButton(
                   onPressed: _isLoading ? null : _sendVerificationCode,
-                  child: const Text('Resend Code'),
+                  child: Text(l10n.resendCode),
                 ),
               ],
               const SizedBox(height: 16),
               TextFormField(
                 controller: _firstNameController,
-                decoration: const InputDecoration(
-                  labelText: 'First Name',
-                  hintText: 'Enter your first name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                decoration: InputDecoration(
+                  labelText: l10n.firstName,
+                  hintText: l10n.firstNameHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your first name';
+                    return l10n.enterFirstName;
                   }
                   return null;
                 },
@@ -439,15 +488,15 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _lastNameController,
-                decoration: const InputDecoration(
-                  labelText: 'Last Name',
-                  hintText: 'Enter your last name',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.person),
+                decoration: InputDecoration(
+                  labelText: l10n.lastName,
+                  hintText: l10n.lastNameHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.person),
                 ),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your last name';
+                    return l10n.enterLastName;
                   }
                   return null;
                 },
@@ -455,19 +504,19 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                decoration: const InputDecoration(
-                  labelText: 'Password',
-                  hintText: 'Enter your password',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock),
+                decoration: InputDecoration(
+                  labelText: l10n.password,
+                  hintText: l10n.passwordHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
                 ),
                 obscureText: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please enter your password';
+                    return l10n.enterPassword;
                   }
                   if (value.length < 6) {
-                    return 'Password must be at least 6 characters';
+                    return l10n.passwordMinLength;
                   }
                   return null;
                 },
@@ -475,19 +524,19 @@ class _RegisterPageState extends State<RegisterPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
-                decoration: const InputDecoration(
-                  labelText: 'Confirm Password',
-                  hintText: 'Confirm your password',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.lock_outline),
+                decoration: InputDecoration(
+                  labelText: l10n.confirmPassword,
+                  hintText: l10n.confirmPasswordHint,
+                  border: const OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock_outline),
                 ),
                 obscureText: true,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
-                    return 'Please confirm your password';
+                    return l10n.confirmPasswordRequired;
                   }
                   if (value != _passwordController.text) {
-                    return 'Passwords do not match';
+                    return l10n.passwordsDoNotMatch;
                   }
                   return null;
                 },
@@ -496,22 +545,28 @@ class _RegisterPageState extends State<RegisterPage> {
               InkWell(
                 onTap: _selectBirthDate,
                 child: InputDecorator(
-                  decoration: const InputDecoration(
-                    labelText: 'Birth Date',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.calendar_today),
+                  decoration: InputDecoration(
+                    labelText: l10n.birthDate,
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.calendar_today),
+                    errorText: _showBirthDateError ? l10n.selectBirthDateError : null,
                   ),
                   child: Text(
                     _selectedBirthDate == null
-                        ? 'Select your birth date'
+                        ? l10n.selectBirthDate
                         : '${_selectedBirthDate!.day}/${_selectedBirthDate!.month}/${_selectedBirthDate!.year}',
+                    style: TextStyle(
+                      color: _selectedBirthDate == null
+                          ? Colors.grey.shade600
+                          : null,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 24),
-              const Text(
-                'Choose Avatar Color',
-                style: TextStyle(
+              Text(
+                l10n.chooseAvatarColor,
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
@@ -548,7 +603,7 @@ class _RegisterPageState extends State<RegisterPage> {
               ),
               const SizedBox(height: 40),
               ElevatedButton(
-                onPressed: (_isLoading || !_isCodeVerified) ? null : _register,
+                onPressed: _isLoading ? null : _register,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF2E7D32),
                   foregroundColor: Colors.white,
@@ -563,9 +618,9 @@ class _RegisterPageState extends State<RegisterPage> {
                         width: 20,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text(
-                        'Create Account',
-                        style: TextStyle(
+                    : Text(
+                        l10n.createAccount,
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),

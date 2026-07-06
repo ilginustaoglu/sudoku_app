@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/services.dart';
-import '../models/user_profile.dart';
+import '../services/locale_manager.dart';
+import '../l10n/app_localizations.dart';
 import '../services/theme_manager.dart';
 import '../services/sound_manager.dart';
 import '../services/highlight_color_manager.dart';
@@ -15,19 +15,20 @@ class SettingsPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final themeManager = Provider.of<ThemeManager>(context);
-    
+    final l10n = AppLocalizations.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(l10n.settings),
         centerTitle: true,
       ),
       body: ListView(
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16.0),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
             child: Text(
-              'App Settings',
-              style: TextStyle(
+              l10n.appSettings,
+              style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
               ),
@@ -35,41 +36,41 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.palette),
-            title: const Text('Theme'),
-            subtitle: Text(_getThemeModeText(themeManager.themeMode)),
+            title: Text(l10n.theme),
+            subtitle: Text(l10n.themeModeLabel(themeManager.themeMode)),
             trailing: PopupMenuButton<ThemeMode>(
               icon: const Icon(Icons.chevron_right),
               onSelected: (ThemeMode mode) {
                 themeManager.setThemeMode(mode);
               },
               itemBuilder: (BuildContext context) => [
-                const PopupMenuItem<ThemeMode>(
+                PopupMenuItem<ThemeMode>(
                   value: ThemeMode.system,
                   child: Row(
                     children: [
-                      Icon(Icons.brightness_auto),
-                      SizedBox(width: 8),
-                      Text('System'),
+                      const Icon(Icons.brightness_auto),
+                      const SizedBox(width: 8),
+                      Text(l10n.themeSystem),
                     ],
                   ),
                 ),
-                const PopupMenuItem<ThemeMode>(
+                PopupMenuItem<ThemeMode>(
                   value: ThemeMode.light,
                   child: Row(
                     children: [
-                      Icon(Icons.brightness_high),
-                      SizedBox(width: 8),
-                      Text('Light'),
+                      const Icon(Icons.brightness_high),
+                      const SizedBox(width: 8),
+                      Text(l10n.themeLight),
                     ],
                   ),
                 ),
-                const PopupMenuItem<ThemeMode>(
+                PopupMenuItem<ThemeMode>(
                   value: ThemeMode.dark,
                   child: Row(
                     children: [
-                      Icon(Icons.brightness_low),
-                      SizedBox(width: 8),
-                      Text('Dark'),
+                      const Icon(Icons.brightness_low),
+                      const SizedBox(width: 8),
+                      Text(l10n.themeDark),
                     ],
                   ),
                 ),
@@ -77,12 +78,76 @@ class SettingsPage extends StatelessWidget {
             ),
           ),
           const Divider(),
+          Consumer<LocaleManager>(
+            builder: (context, localeManager, child) {
+              return ListTile(
+                leading: const Icon(Icons.language),
+                title: Text(l10n.language),
+                subtitle: Text(l10n.languageLabel(localeManager.language)),
+                trailing: PopupMenuButton<AppLanguage>(
+                  icon: const Icon(Icons.chevron_right),
+                  onSelected: localeManager.setLanguage,
+                  itemBuilder: (BuildContext context) => [
+                    PopupMenuItem(
+                      value: AppLanguage.system,
+                      child: Text(l10n.langSystem),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.english,
+                      child: Text(l10n.langEnglish),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.turkish,
+                      child: Text(l10n.langTurkish),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.german,
+                      child: Text(l10n.langGerman),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.french,
+                      child: Text(l10n.langFrench),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.spanish,
+                      child: Text(l10n.langSpanish),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.italian,
+                      child: Text(l10n.langItalian),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.japanese,
+                      child: Text(l10n.langJapanese),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.chinese,
+                      child: Text(l10n.langChinese),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.korean,
+                      child: Text(l10n.langKorean),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.dutch,
+                      child: Text(l10n.langDutch),
+                    ),
+                    PopupMenuItem(
+                      value: AppLanguage.russian,
+                      child: Text(l10n.langRussian),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const Divider(),
           Consumer<SoundManager>(
             builder: (context, soundManager, child) {
               return ListTile(
                 leading: const Icon(Icons.volume_up),
-                title: const Text('Sound'),
-                subtitle: const Text('Enable/disable sound effects'),
+                title: Text(l10n.sound),
+                subtitle: Text(l10n.soundSubtitle),
                 trailing: Switch(
                   value: soundManager.soundEnabled,
                   onChanged: (value) {
@@ -100,9 +165,15 @@ class SettingsPage extends StatelessWidget {
                   Icons.colorize,
                   color: highlightColorManager.highlightColor,
                 ),
-                title: const Text('Highlight Color'),
+                title: Text(l10n.highlightColor),
                 subtitle: Text(
-                  'Selected: ${highlightColorManager.getColorName(highlightColorManager.highlightColor)}',
+                  l10n.selectedColor(
+                    l10n.localizedColorName(
+                      highlightColorManager.getColorKey(
+                        highlightColorManager.highlightColor,
+                      ),
+                    ),
+                  ),
                 ),
                 trailing: PopupMenuButton<Color>(
                   icon: Icon(
@@ -115,7 +186,7 @@ class SettingsPage extends StatelessWidget {
                   itemBuilder: (BuildContext context) {
                     return HighlightColorManager.availableColors.map((colorMap) {
                       final color = colorMap['color'] as Color;
-                      final name = colorMap['name'] as String;
+                      final nameKey = colorMap['key'] as String;
                       final isSelected = highlightColorManager.highlightColor == color;
                       
                       return PopupMenuItem<Color>(
@@ -135,7 +206,7 @@ class SettingsPage extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 12),
-                            Text(name),
+                            Text(l10n.localizedColorName(nameKey)),
                             if (isSelected) ...[
                               const Spacer(),
                               Icon(
@@ -154,17 +225,44 @@ class SettingsPage extends StatelessWidget {
             },
           ),
           const Divider(),
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Text(
+              l10n.profileVisibility,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          Consumer<ProfileVisibilityManager>(
+            builder: (context, visibilityManager, child) {
+              return Column(
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.person),
+                    title: Text(l10n.showName),
+                    subtitle: Text(l10n.showNameSubtitle),
+                    trailing: Switch(
+                      value: visibilityManager.showName,
+                      onChanged: visibilityManager.setShowName,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
           Consumer<StatisticsVisibilityManager>(
             builder: (context, visibilityManager, child) {
               return ListTile(
-                leading: const Icon(Icons.visibility),
-                title: const Text('Statistics Visibility'),
-                subtitle: Text(visibilityManager.getVisibilityText(visibilityManager.visibility)),
+                leading: const Icon(Icons.bar_chart),
+                title: Text(l10n.statisticsVisibility),
+                subtitle: Text(
+                  l10n.visibilityLabel(visibilityManager.visibility),
+                ),
                 trailing: PopupMenuButton<StatisticsVisibility>(
                   icon: const Icon(Icons.chevron_right),
-                  onSelected: (StatisticsVisibility visibility) {
-                    visibilityManager.setVisibility(visibility);
-                  },
+                  onSelected: visibilityManager.setVisibility,
                   itemBuilder: (BuildContext context) => [
                     PopupMenuItem<StatisticsVisibility>(
                       value: StatisticsVisibility.onlyMe,
@@ -172,7 +270,7 @@ class SettingsPage extends StatelessWidget {
                         children: [
                           const Icon(Icons.lock),
                           const SizedBox(width: 8),
-                          const Text('Only Me'),
+                          Text(l10n.visibilityOnlyMe),
                           if (visibilityManager.visibility == StatisticsVisibility.onlyMe) ...[
                             const Spacer(),
                             const Icon(Icons.check, color: Color(0xFF2E7D32)),
@@ -186,7 +284,7 @@ class SettingsPage extends StatelessWidget {
                         children: [
                           const Icon(Icons.people),
                           const SizedBox(width: 8),
-                          const Text('My Friends'),
+                          Text(l10n.visibilityFriends),
                           if (visibilityManager.visibility == StatisticsVisibility.friends) ...[
                             const Spacer(),
                             const Icon(Icons.check, color: Color(0xFF2E7D32)),
@@ -200,7 +298,7 @@ class SettingsPage extends StatelessWidget {
                         children: [
                           const Icon(Icons.public),
                           const SizedBox(width: 8),
-                          const Text('Everyone'),
+                          Text(l10n.visibilityEveryone),
                           if (visibilityManager.visibility == StatisticsVisibility.everyone) ...[
                             const Spacer(),
                             const Icon(Icons.check, color: Color(0xFF2E7D32)),
@@ -210,48 +308,6 @@ class SettingsPage extends StatelessWidget {
                     ),
                   ],
                 ),
-              );
-            },
-          ),
-          const Divider(),
-          // Profil Görünürlük Ayarları
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              'Profile Visibility',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Consumer<ProfileVisibilityManager>(
-            builder: (context, visibilityManager, child) {
-              return Column(
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.person),
-                    title: const Text('Show Name'),
-                    subtitle: const Text('Display your name on profile'),
-                    trailing: Switch(
-                      value: visibilityManager.showName,
-                      onChanged: (value) {
-                        visibilityManager.setShowName(value);
-                      },
-                    ),
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.email),
-                    title: const Text('Show Email'),
-                    subtitle: const Text('Display your email on profile'),
-                    trailing: Switch(
-                      value: visibilityManager.showEmail,
-                      onChanged: (value) {
-                        visibilityManager.setShowEmail(value);
-                      },
-                    ),
-                  ),
-                ],
               );
             },
           ),
@@ -266,9 +322,16 @@ class SettingsPage extends StatelessWidget {
               
               return ListTile(
                 leading: const Icon(Icons.badge),
-                title: const Text('Display Name'),
-                subtitle: Text(profile.displayName ?? 'Not set'),
-                trailing: const Icon(Icons.chevron_right),
+                title: Text(l10n.displayName),
+                subtitle: Text(l10n.displayNamePersonalSubtitle),
+                trailing: Text(
+                  profile.displayName ?? l10n.displayNameNotSet,
+                  style: TextStyle(
+                    color: profile.displayName != null
+                        ? Theme.of(context).colorScheme.primary
+                        : Colors.grey,
+                  ),
+                ),
                 onTap: () => _showDisplayNameDialog(context, profileManager, profile),
               );
             },
@@ -301,8 +364,8 @@ class SettingsPage extends StatelessWidget {
                 children: [
                   ListTile(
                     leading: const Icon(Icons.account_circle),
-                    title: const Text('Profile Color'),
-                    subtitle: const Text('Choose profile avatar color'),
+                    title: Text(l10n.profileColor),
+                    subtitle: Text(l10n.profileColorSubtitle),
                     trailing: PopupMenuButton<Color>(
                       icon: Container(
                         width: 30,
@@ -320,8 +383,8 @@ class SettingsPage extends StatelessWidget {
                         await profileManager.updateProfile(updatedProfile);
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Profile color updated successfully'),
+                            SnackBar(
+                              content: Text(l10n.profileColorUpdated),
                             ),
                           );
                         }
@@ -346,7 +409,7 @@ class SettingsPage extends StatelessWidget {
                                   ),
                                 ),
                                 const SizedBox(width: 12),
-                                Text(_getColorName(color)),
+                                Text(l10n.localizedColor(color)),
                                 if (isSelected) ...[
                                   const Spacer(),
                                   const Icon(Icons.check, color: Color(0xFF2E7D32)),
@@ -363,174 +426,33 @@ class SettingsPage extends StatelessWidget {
               );
             },
           ),
-          Consumer<ProfileManager>(
-            builder: (context, profileManager, child) {
-              return ListTile(
-                leading: const Icon(Icons.storage),
-                title: const Text('Database Info'),
-                subtitle: FutureBuilder<Map<String, dynamic>>(
-                  future: profileManager.getDatabaseStats(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      final stats = snapshot.data!;
-                      return Text(
-                        '${stats['profilesCount']} profiles, ${stats['scoresCount']} scores',
-                      );
-                    }
-                    return const Text('Loading...');
-                  },
-                ),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () async {
-                  try {
-                    final stats = await profileManager.getDatabaseStats();
-                    final dbPath = stats['databasePath'];
-                    if (context.mounted) {
-                      showDialog(
-                        context: context,
-                        builder: (BuildContext dialogContext) {
-                          return AlertDialog(
-                            title: const Text('Database Information'),
-                            content: SingleChildScrollView(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Text(
-                                    'Database Name:',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const Text('sudoku_profiles.db'),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Statistics:',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  Text('Profiles: ${stats['profilesCount']}'),
-                                  Text('Game Scores: ${stats['scoresCount']}'),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Database Path:',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  SelectableText(dbPath),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'To open in TablePlus:',
-                                    style: TextStyle(fontWeight: FontWeight.bold),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text('1. Open TablePlus'),
-                                  const Text('2. Click "Create a new connection"'),
-                                  const Text('3. Select "SQLite"'),
-                                  const Text('4. Paste the path above'),
-                                  const Text('5. Click "Connect"'),
-                                ],
-                              ),
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: dbPath));
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Database path copied to clipboard'),
-                                    ),
-                                  );
-                                },
-                                child: const Text('Copy Path'),
-                              ),
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('Close'),
-                              ),
-                            ],
-                          );
-                        },
-                      );
-                    }
-                  } catch (e) {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  }
-                },
-              );
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.info),
-            title: const Text('About'),
-            subtitle: const Text('App information'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: 'Pandoku',
-                applicationVersion: '1.0.0',
-                applicationIcon: const Icon(Icons.grid_4x4, size: 48),
-              );
-            },
-          ),
         ],
       ),
     );
   }
 
-  String _getThemeModeText(ThemeMode mode) {
-    switch (mode) {
-      case ThemeMode.system:
-        return 'System theme';
-      case ThemeMode.light:
-        return 'Light theme';
-      case ThemeMode.dark:
-        return 'Dark theme';
-    }
-  }
-
-  String _getColorName(Color color) {
-    if (color == Colors.blue) return 'Blue';
-    if (color == Colors.green) return 'Green';
-    if (color == Colors.orange) return 'Orange';
-    if (color == Colors.purple) return 'Purple';
-    if (color == Colors.red) return 'Red';
-    if (color == Colors.teal) return 'Teal';
-    if (color == Colors.pink) return 'Pink';
-    if (color == Colors.indigo) return 'Indigo';
-    if (color == Colors.amber) return 'Amber';
-    if (color == Colors.cyan) return 'Cyan';
-    if (color == Colors.brown) return 'Brown';
-    if (color == Colors.grey) return 'Grey';
-    return 'Unknown';
-  }
-
   Future<void> _showDisplayNameDialog(BuildContext context, ProfileManager profileManager, profile) async {
+    final l10n = AppLocalizations.of(context);
     final TextEditingController controller = TextEditingController(text: profile.displayName ?? '');
     
     await showDialog(
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          title: const Text('Set Display Name'),
+          title: Text(l10n.setDisplayName),
           content: TextField(
             controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Display Name',
-              hintText: 'Enter your display name',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.displayName,
+              hintText: l10n.displayNameHint,
+              border: const OutlineInputBorder(),
             ),
             maxLength: 30,
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             TextButton(
               onPressed: () async {
@@ -542,13 +464,13 @@ class SettingsPage extends StatelessWidget {
                 if (context.mounted) {
                   Navigator.pop(dialogContext);
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Display name updated successfully'),
+                    SnackBar(
+                      content: Text(l10n.displayNameUpdated),
                     ),
                   );
                 }
               },
-              child: const Text('Save'),
+              child: Text(l10n.save),
             ),
           ],
         );

@@ -33,6 +33,14 @@ class UserProfile {
 
   String get fullName => '$firstName $lastName';
 
+  /// Kişisel görünen ad; yalnızca kullanıcının kendi profilinde gösterilir.
+  String get personalName {
+    if (displayName != null && displayName!.trim().isNotEmpty) {
+      return displayName!.trim();
+    }
+    return fullName;
+  }
+
   // JSON'a çevir
   Map<String, dynamic> toJson() {
     return {

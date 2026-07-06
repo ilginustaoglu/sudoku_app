@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
+import '../l10n/app_localizations.dart';
+import '../models/profile_stats.dart';
 import '../services/profile_manager.dart';
 import '../services/statistics_visibility_manager.dart';
-import '../services/profile_visibility_manager.dart';
 
 class UserProfileDisplayPage extends StatefulWidget {
   const UserProfileDisplayPage({super.key});
@@ -13,27 +14,33 @@ class UserProfileDisplayPage extends StatefulWidget {
 }
 
 class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
-  Map<String, dynamic>? _stats;
+  ProfileStats? _stats;
   bool _isLoading = true;
+  String? _expandedDifficulty;
 
   @override
   void initState() {
     super.initState();
-    _loadStatistics();
+    _loadProfileData();
   }
 
-  Future<void> _loadStatistics() async {
+  Future<void> _loadProfileData() async {
     final profileManager = Provider.of<ProfileManager>(context, listen: false);
-    if (profileManager.currentProfile != null) {
-      final stats = await profileManager.getProfileStats(
-        profileManager.currentProfile!.id,
-      );
+    if (profileManager.currentProfile == null) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+      return;
+    }
+
+    await profileManager.refreshCurrentProfile();
+
+    final profileId = profileManager.currentProfile!.id;
+    final stats = await profileManager.getProfileStats(profileId);
+
+    if (mounted) {
       setState(() {
         _stats = stats;
-        _isLoading = false;
-      });
-    } else {
-      setState(() {
         _isLoading = false;
       });
     }
@@ -41,20 +48,21 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Colors.white.withOpacity(0.9),
-        iconTheme: const IconThemeData(color: Colors.black),
-        elevation: 0,
+        title: Text(l10n.profile),
+        centerTitle: true,
       ),
       body: Consumer<ProfileManager>(
         builder: (context, profileManager, child) {
           final profile = profileManager.currentProfile;
           
           if (profile == null || profileManager.isGuestMode) {
-            return const Center(
-              child: Text('No profile available'),
+            return Center(
+              child: Text(l10n.noProfileAvailable),
             );
           }
 
@@ -63,10 +71,8 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Üst boşluk (cover yok)
                 const SizedBox(height: 20),
                 
-                // Profil fotoğrafı
                 Container(
                   width: 120,
                   height: 120,
@@ -77,7 +83,7 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                         : Colors.grey.shade300,
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.2),
+                        color: Colors.black.withOpacity(0.15),
                         blurRadius: 10,
                         spreadRadius: 2,
                       ),
@@ -104,94 +110,60 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                         ),
                 ),
                 
+                const SizedBox(height: 20),
+
+                Text(
+                  profile.personalName,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                
                 const SizedBox(height: 24),
-                
-                // İsim Soyisim veya Display Name
-                Consumer<ProfileVisibilityManager>(
-                  builder: (context, visibilityManager, child) {
-                    String displayText;
-                    
-                    // Eğer tüm bilgiler gizliyse "no name user" göster
-                    if (visibilityManager.isAllInfoHidden) {
-                      displayText = 'no name user';
-                    } else if (profile.displayName != null && profile.displayName!.isNotEmpty) {
-                      // Display name varsa onu göster
-                      displayText = profile.displayName!;
-                    } else if (visibilityManager.showName) {
-                      // İsim gösteriliyorsa fullName göster
-                      displayText = profile.fullName;
-                    } else {
-                      // Hiçbiri gösterilmiyorsa "no name user"
-                      displayText = 'no name user';
-                    }
-                    
-                    return Text(
-                      displayText,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: _ComingSoonButton(
+                        label: l10n.myFriends,
+                        comingSoon: l10n.comingSoon,
+                        icon: Icons.people_outline,
                       ),
-                    );
-                  },
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _ComingSoonButton(
+                        label: l10n.addFriend,
+                        comingSoon: l10n.comingSoon,
+                        icon: Icons.person_add_outlined,
+                      ),
+                    ),
+                  ],
                 ),
                 
-                const SizedBox(height: 8),
+                const SizedBox(height: 32),
                 
-                // Email (görünürlük ayarına göre)
-                Consumer<ProfileVisibilityManager>(
-                  builder: (context, visibilityManager, child) {
-                    if (!visibilityManager.showEmail) {
-                      return const SizedBox.shrink();
-                    }
-                    
-                    return Text(
-                      profile.email,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        color: Colors.white,
-                      ),
-                    );
-                  },
-                ),
-                
-                const SizedBox(height: 40),
-                
-                // İstatistikler başlığı
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Statistics',
-                      style: TextStyle(
-                        fontSize: 24,
+                    Text(
+                      l10n.statistics,
+                      style: theme.textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                     // İstatistik görünürlük durumu
                     Consumer<StatisticsVisibilityManager>(
                       builder: (context, visibilityManager, child) {
-                        IconData icon;
-                        String tooltip;
-                        switch (visibilityManager.visibility) {
-                          case StatisticsVisibility.onlyMe:
-                            icon = Icons.lock;
-                            tooltip = 'Only Me';
-                            break;
-                          case StatisticsVisibility.friends:
-                            icon = Icons.people;
-                            tooltip = 'My Friends';
-                            break;
-                          case StatisticsVisibility.everyone:
-                            icon = Icons.public;
-                            tooltip = 'Everyone';
-                            break;
-                        }
                         return Tooltip(
-                          message: tooltip,
+                          message: l10n.visibilityLabel(visibilityManager.visibility),
                           child: Icon(
-                            icon,
+                            visibilityManager.visibility == StatisticsVisibility.onlyMe
+                                ? Icons.lock
+                                : visibilityManager.visibility == StatisticsVisibility.friends
+                                    ? Icons.people
+                                    : Icons.public,
                             color: Colors.grey.shade600,
                             size: 20,
                           ),
@@ -207,9 +179,9 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
                 else if (_stats != null)
-                  _buildStatistics(_stats!)
+                  _buildStatistics(_stats!, l10n)
                 else
-                  const Text('No statistics available'),
+                  Text(l10n.noStatisticsAvailable),
               ],
             ),
           );
@@ -218,16 +190,21 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
     );
   }
 
-  Widget _buildStatistics(Map<String, dynamic> stats) {
+  Widget _buildStatistics(ProfileStats stats, AppLocalizations l10n) {
+    if (!stats.hasAnyGames) {
+      return Text(l10n.noStatisticsAvailable);
+    }
+
+    final overall = stats.overall;
+
     return Column(
       children: [
-        // Toplam oyunlar ve toplam skor
         Row(
           children: [
             Expanded(
               child: _buildStatCard(
-                'Total Games',
-                stats['totalGames'].toString(),
+                l10n.statTotalGames,
+                overall.totalGames.toString(),
                 Icons.games,
                 const Color(0xFF2E7D32),
               ),
@@ -235,24 +212,21 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                'Total Score',
-                stats['totalScore'].toString(),
+                l10n.statTotalScore,
+                overall.totalScore.toString(),
                 Icons.star,
                 const Color(0xFF6F4E37),
               ),
             ),
           ],
         ),
-        
         const SizedBox(height: 12),
-        
-        // En iyi skor ve ortalama skor
         Row(
           children: [
             Expanded(
               child: _buildStatCard(
-                'Best Score',
-                stats['bestScore'].toString(),
+                l10n.statBestScore,
+                overall.bestScore.toString(),
                 Icons.emoji_events,
                 Colors.amber,
               ),
@@ -260,83 +234,75 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
             const SizedBox(width: 12),
             Expanded(
               child: _buildStatCard(
-                'Average Score',
-                stats['averageScore'].toString(),
+                l10n.statAverageScore,
+                overall.averageScore.toString(),
                 Icons.trending_up,
                 Colors.orange,
               ),
             ),
           ],
         ),
-        
         const SizedBox(height: 12),
-        
-        // Toplam süre
         _buildStatCard(
-          'Total Time',
-          _formatTime(stats['totalTime'] as int),
+          l10n.statTotalTime,
+          l10n.formatDuration(overall.totalTime),
           Icons.timer,
           Colors.blue,
         ),
-        
         const SizedBox(height: 24),
-        
-        // Zorluk seviyelerine göre oyunlar
-        const Text(
-          'Games by Difficulty',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            l10n.gamesByDifficulty,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
-        
         const SizedBox(height: 12),
-        
-        Row(
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                'Easy',
-                stats['easyGames'].toString(),
-                Icons.check_circle,
-                Colors.green,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                'Medium',
-                stats['mediumGames'].toString(),
-                Icons.info,
-                Colors.orange,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _buildStatCard(
-                'Hard',
-                stats['hardGames'].toString(),
-                Icons.warning,
-                Colors.red,
-              ),
-            ),
-          ],
+        _buildDifficultySection(
+          l10n: l10n,
+          label: l10n.easy,
+          stats: stats.easy,
+          color: Colors.green,
+          icon: Icons.check_circle,
+        ),
+        const SizedBox(height: 12),
+        _buildDifficultySection(
+          l10n: l10n,
+          label: l10n.medium,
+          stats: stats.medium,
+          color: Colors.orange,
+          icon: Icons.info,
+        ),
+        const SizedBox(height: 12),
+        _buildDifficultySection(
+          l10n: l10n,
+          label: l10n.hard,
+          stats: stats.hard,
+          color: Colors.red,
+          icon: Icons.warning,
         ),
       ],
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.95), // Opak beyaz arka plan
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.5), width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withOpacity(0.06),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -369,18 +335,243 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
     );
   }
 
-  String _formatTime(int seconds) {
-    final hours = seconds ~/ 3600;
-    final minutes = (seconds % 3600) ~/ 60;
-    final secs = seconds % 60;
-    
-    if (hours > 0) {
-      return '${hours}h ${minutes}m';
-    } else if (minutes > 0) {
-      return '${minutes}m ${secs}s';
-    } else {
-      return '${secs}s';
-    }
+  Widget _buildDifficultySection({
+    required AppLocalizations l10n,
+    required String label,
+    required DifficultyStats stats,
+    required Color color,
+    required IconData icon,
+  }) {
+    final isExpanded = _expandedDifficulty == stats.difficulty;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _expandedDifficulty =
+                isExpanded ? null : stats.difficulty;
+          });
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isExpanded ? color : color.withOpacity(0.4),
+              width: isExpanded ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.06),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(icon, color: color, size: 28),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: color,
+                          ),
+                        ),
+                        Text(
+                          l10n.statGamesPlayed(stats.totalGames),
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(
+                    isExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                    color: Colors.grey.shade600,
+                  ),
+                ],
+              ),
+              if (isExpanded) ...[
+                const SizedBox(height: 16),
+                const Divider(height: 1),
+                const SizedBox(height: 16),
+                _buildDifficultyDetails(l10n, stats, color),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
+  Widget _buildDifficultyDetails(
+    AppLocalizations l10n,
+    DifficultyStats stats,
+    Color color,
+  ) {
+    if (!stats.hasGames) {
+      return Text(
+        l10n.noStatisticsAvailable,
+        style: TextStyle(color: Colors.grey.shade600),
+      );
+    }
+
+    return Column(
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildDetailItem(
+                l10n.statTotalGames,
+                stats.totalGames.toString(),
+                color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDetailItem(
+                l10n.statTotalScore,
+                stats.totalScore.toString(),
+                color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: _buildDetailItem(
+                l10n.statBestScore,
+                stats.bestScore.toString(),
+                color,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildDetailItem(
+                l10n.statAverageScore,
+                stats.averageScore.toString(),
+                color,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        _buildDetailItem(
+          l10n.statTotalTime,
+          l10n.formatDuration(stats.totalTime),
+          color,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDetailItem(String title, String value, Color color) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+}
+
+class _ComingSoonButton extends StatelessWidget {
+  const _ComingSoonButton({
+    required this.label,
+    required this.comingSoon,
+    required this.icon,
+  });
+
+  final String label;
+  final String comingSoon;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: 0.55,
+      child: OutlinedButton(
+        onPressed: null,
+        style: OutlinedButton.styleFrom(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          foregroundColor: Colors.grey.shade700,
+          disabledForegroundColor: Colors.grey.shade700,
+          side: BorderSide(color: Colors.grey.shade400),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 18),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              comingSoon,
+              style: TextStyle(
+                fontSize: 11,
+                fontStyle: FontStyle.italic,
+                color: Colors.grey.shade600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -8,6 +8,7 @@ class SudokuGame {
   int score; // Skor
   int errorCount; // Hata sayısı
   DateTime? startTime; // Oyun başlangıç zamanı (timer için)
+  DateTime? dailyPuzzleDate; // Günlük bulmacanın takvim tarihi
   int elapsedSeconds; // Toplam geçen saniye (oyun çıkıldığında kaydedilir) - mutable
   List<List<Set<int>>> notes; // Notlar (her hücre için olası sayılar)
 
@@ -21,6 +22,7 @@ class SudokuGame {
     this.score = 0,
     this.errorCount = 0,
     DateTime? startTime,
+    this.dailyPuzzleDate,
     this.elapsedSeconds = 0,
     List<List<Set<int>>>? notes,
   }) : currentBoard = currentBoard ?? puzzle.map((row) => List<int>.from(row)).toList(),
@@ -39,6 +41,7 @@ class SudokuGame {
       'score': score,
       'errorCount': errorCount,
       'startTime': startTime?.toIso8601String(),
+      'dailyPuzzleDate': dailyPuzzleDate?.toIso8601String(),
       'elapsedSeconds': elapsedSeconds,
       'notes': notes.map((row) => row.map((noteSet) => noteSet.toList()).toList()).toList(),
     };
@@ -67,6 +70,9 @@ class SudokuGame {
       score: json['score'] ?? 0,
       errorCount: json['errorCount'] ?? 0,
       startTime: json['startTime'] != null ? DateTime.parse(json['startTime']) : null,
+      dailyPuzzleDate: json['dailyPuzzleDate'] != null
+          ? DateTime.parse(json['dailyPuzzleDate'])
+          : null,
       elapsedSeconds: json['elapsedSeconds'] ?? 0,
       notes: notesData,
     );

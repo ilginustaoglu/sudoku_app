@@ -87,19 +87,9 @@ class GameStateManager extends ChangeNotifier {
   // Mevcut oyunu güncelle
   void updateGame(SudokuGame game) {
     _currentGame = game;
-    _saveGame(); // async çağrı, await edilmiyor ama sorun değil
-    
-    // Eğer bugünün günlük oyunu ise kaydet (tamamlanmamış olsa bile)
-    final dailyGameManager = DailyGameManager();
-    final now = DateTime.now();
-    if (game.startTime != null) {
-      final gameDate = DateTime(game.startTime!.year, game.startTime!.month, game.startTime!.day);
-      final today = DateTime(now.year, now.month, now.day);
-      if (gameDate == today) {
-        dailyGameManager.saveDailyGame(now, game);
-      }
-    }
-    
+    _saveGame();
+
+    _persistDailyGame(game);
     notifyListeners();
   }
 
@@ -107,19 +97,22 @@ class GameStateManager extends ChangeNotifier {
   void completeGame() {
     if (_currentGame != null) {
       _currentGame!.isCompleted = true;
-      _saveGame(); // async çağrı, await edilmiyor ama sorun değil
-      
-      // İstatistikleri kaydet
+      _saveGame();
+
       final statisticsManager = StatisticsManager();
       final now = DateTime.now();
       statisticsManager.recordCompletedGame(now);
-      
-      // Eğer bugünün günlük oyunu ise kaydet
-      final dailyGameManager = DailyGameManager();
-      dailyGameManager.saveDailyGame(now, _currentGame!);
-      
+
+      _persistDailyGame(_currentGame!);
+
       notifyListeners();
     }
+  }
+
+  void _persistDailyGame(SudokuGame game) {
+    final puzzleDate = game.dailyPuzzleDate;
+    if (puzzleDate == null) return;
+    DailyGameManager().saveDailyGame(puzzleDate, game);
   }
 
   // Devam eden oyunu temizle

@@ -26,7 +26,9 @@ class DailyGameManager {
     if (gameJson != null) {
       try {
         final gameMap = json.decode(gameJson) as Map<String, dynamic>;
-        return SudokuGame.fromJson(gameMap);
+        final game = SudokuGame.fromJson(gameMap);
+        _ensureDailyPuzzleDate(game, date);
+        return game;
       } catch (e) {
         // Hata durumunda yeni oyun oluştur
       }
@@ -38,9 +40,14 @@ class DailyGameManager {
     final difficulty = difficulties[random.nextInt(difficulties.length)];
     
     final game = SudokuGenerator.generateNewGame(difficulty: difficulty);
+    _ensureDailyPuzzleDate(game, date);
     await saveDailyGame(date, game);
     
     return game;
+  }
+
+  void _ensureDailyPuzzleDate(SudokuGame game, DateTime date) {
+    game.dailyPuzzleDate = DateTime(date.year, date.month, date.day);
   }
 
   // Günlük oyunu kaydet

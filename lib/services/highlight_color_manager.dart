@@ -2,20 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HighlightColorManager extends ChangeNotifier {
-  Color _highlightColor = Colors.purple; // Default: parlak mor
+  Color _highlightColor = Colors.purple;
 
   Color get highlightColor => _highlightColor;
 
-  // Kullanılabilir renkler
   static const List<Map<String, dynamic>> availableColors = [
-    {'name': 'Purple', 'color': Colors.purple},
-    {'name': 'Blue', 'color': Colors.blue},
-    {'name': 'Red', 'color': Colors.red},
-    {'name': 'Green', 'color': Colors.green},
-    {'name': 'Orange', 'color': Colors.orange},
-    {'name': 'Pink', 'color': Colors.pink},
-    {'name': 'Teal', 'color': Colors.teal},
-    {'name': 'Cyan', 'color': Colors.cyan},
+    {'key': 'colorPurple', 'color': Colors.purple},
+    {'key': 'colorBlue', 'color': Colors.blue},
+    {'key': 'colorRed', 'color': Colors.red},
+    {'key': 'colorGreen', 'color': Colors.green},
+    {'key': 'colorOrange', 'color': Colors.orange},
+    {'key': 'colorPink', 'color': Colors.pink},
+    {'key': 'colorTeal', 'color': Colors.teal},
+    {'key': 'colorCyan', 'color': Colors.cyan},
   ];
 
   HighlightColorManager() {
@@ -31,7 +30,6 @@ class HighlightColorManager extends ChangeNotifier {
       }
       notifyListeners();
     } catch (e) {
-      // Hata durumunda default rengi kullan
       _highlightColor = Colors.purple;
     }
   }
@@ -40,23 +38,22 @@ class HighlightColorManager extends ChangeNotifier {
     if (_highlightColor != color) {
       _highlightColor = color;
       notifyListeners();
-      
+
       try {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt('highlight_color', color.value);
       } catch (e) {
-        // Hata durumunda sessizce devam et
+        // Error case: silently continue
       }
     }
   }
 
-  String getColorName(Color color) {
-    for (var colorMap in availableColors) {
+  String getColorKey(Color color) {
+    for (final colorMap in availableColors) {
       if (colorMap['color'] == color) {
-        return colorMap['name'];
+        return colorMap['key'] as String;
       }
     }
-    return 'Custom';
+    return 'colorCustom';
   }
 }
-

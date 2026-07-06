@@ -42,6 +42,7 @@ class StatisticsVisibilityManager extends ChangeNotifier {
   }
 
   String getVisibilityText(StatisticsVisibility visibility) {
+    // Deprecated: use AppLocalizations.visibilityLabel in UI.
     switch (visibility) {
       case StatisticsVisibility.onlyMe:
         return 'Only Me';

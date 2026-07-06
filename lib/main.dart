@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'config/app_config.dart';
 import 'services/game_state_manager.dart';
 import 'services/theme_manager.dart';
 import 'services/sound_manager.dart';
@@ -7,10 +9,20 @@ import 'services/highlight_color_manager.dart';
 import 'services/profile_manager.dart';
 import 'services/statistics_visibility_manager.dart';
 import 'services/profile_visibility_manager.dart';
-import 'pages/home_page.dart';
+import 'services/locale_manager.dart';
+import 'l10n/app_localizations.dart';
+import 'pages/auth_gate.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (AppConfig.isSupabaseConfigured) {
+    await Supabase.initialize(
+      url: AppConfig.supabaseUrl,
+      publishableKey: AppConfig.supabaseAnonKey,
+    );
+  }
+
   runApp(const SudokuApp());
 }
 
@@ -22,6 +34,7 @@ class SudokuApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeManager()),
+        ChangeNotifierProvider(create: (_) => LocaleManager()),
         ChangeNotifierProvider(create: (_) => GameStateManager()),
         ChangeNotifierProvider(create: (_) => SoundManager()),
         ChangeNotifierProvider(create: (_) => HighlightColorManager()),
@@ -29,11 +42,27 @@ class SudokuApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => StatisticsVisibilityManager()),
         ChangeNotifierProvider(create: (_) => ProfileVisibilityManager()),
       ],
-      child: Consumer<ThemeManager>(
-        builder: (context, themeManager, child) {
+      child: Consumer2<ThemeManager, LocaleManager>(
+        builder: (context, themeManager, localeManager, child) {
           return MaterialApp(
             debugShowCheckedModeBanner: false,
             title: 'Pandoku',
+            locale: localeManager.locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            localeResolutionCallback: (deviceLocale, supportedLocales) {
+              if (localeManager.locale != null) {
+                return localeManager.locale!;
+              }
+              if (deviceLocale != null) {
+                for (final supported in supportedLocales) {
+                  if (supported.languageCode == deviceLocale.languageCode) {
+                    return supported;
+                  }
+                }
+              }
+              return const Locale('en');
+            },
             theme: ThemeData(
               primaryColor: const Color(0xFF2E7D32), // Koyu yeşil
               primarySwatch: MaterialColor(
@@ -89,20 +118,10 @@ class SudokuApp extends StatelessWidget {
               ),
             ),
             themeMode: themeManager.themeMode,
-            home: const HomePageWrapper(),
+            home: const AuthGate(),
           );
         },
       ),
     );
-  }
-}
-
-class HomePageWrapper extends StatelessWidget {
-  const HomePageWrapper({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final gameStateManager = Provider.of<GameStateManager>(context);
-    return HomePage(gameStateManager: gameStateManager);
   }
 }
