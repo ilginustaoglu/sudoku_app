@@ -72,6 +72,12 @@ create policy "Anyone can update profiles"
   using (true)
   with check (true);
 
+create policy "Anyone can delete profiles"
+  on public.profiles
+  for delete
+  to anon, authenticated
+  using (true);
+
 -- game_scores
 create policy "Anyone can insert game scores"
   on public.game_scores

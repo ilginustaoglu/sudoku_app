@@ -147,6 +147,12 @@ class AppLocalizations {
   String get todaysGame => tr('todaysGame');
   String get logout => tr('logout');
   String get loggedOutSuccess => tr('loggedOutSuccess');
+  String get deleteAccount => tr('deleteAccount');
+  String get deleteAccountSubtitle => tr('deleteAccountSubtitle');
+  String get deleteAccountConfirmTitle => tr('deleteAccountConfirmTitle');
+  String get deleteAccountConfirmMessage => tr('deleteAccountConfirmMessage');
+  String get deleteAccountSuccess => tr('deleteAccountSuccess');
+  String get deleteAccountFailed => tr('deleteAccountFailed');
   String get selectDifficulty => tr('selectDifficulty');
   String get easy => tr('easy');
   String get medium => tr('medium');

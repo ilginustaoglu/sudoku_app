@@ -33,6 +33,7 @@ alter table public.profiles enable row level security;
 drop policy if exists "Anyone can register a profile" on public.profiles;
 drop policy if exists "Anyone can read profiles" on public.profiles;
 drop policy if exists "Anyone can update profiles" on public.profiles;
+drop policy if exists "Anyone can delete profiles" on public.profiles;
 
 create policy "Anyone can register a profile"
   on public.profiles for insert to anon, authenticated with check (true);
@@ -42,6 +43,9 @@ create policy "Anyone can read profiles"
 
 create policy "Anyone can update profiles"
   on public.profiles for update to anon, authenticated using (true) with check (true);
+
+create policy "Anyone can delete profiles"
+  on public.profiles for delete to anon, authenticated using (true);
 
 -- ---------------------------------------------------------------------------
 -- game_scores policies

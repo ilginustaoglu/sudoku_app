@@ -426,6 +426,38 @@ class SettingsPage extends StatelessWidget {
               );
             },
           ),
+          Consumer<ProfileManager>(
+            builder: (context, profileManager, child) {
+              final profile = profileManager.currentProfile;
+              if (profile == null || profileManager.isGuestMode) {
+                return const SizedBox.shrink();
+              }
+
+              return Column(
+                children: [
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(
+                      Icons.delete_forever,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    title: Text(
+                      l10n.deleteAccount,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                    subtitle: Text(l10n.deleteAccountSubtitle),
+                    onTap: () => _confirmDeleteAccount(
+                      context,
+                      profileManager,
+                      profile.id,
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -478,6 +510,52 @@ class SettingsPage extends StatelessWidget {
     );
     
     controller.dispose();
+  }
+
+  Future<void> _confirmDeleteAccount(
+    BuildContext context,
+    ProfileManager profileManager,
+    String profileId,
+  ) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(l10n.deleteAccountConfirmTitle),
+          content: Text(l10n.deleteAccountConfirmMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(l10n.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: Text(l10n.deleteAccount),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || !context.mounted) return;
+
+    try {
+      await profileManager.deleteProfile(profileId);
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.deleteAccountSuccess)),
+      );
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.deleteAccountFailed)),
+      );
+    }
   }
 
 }
