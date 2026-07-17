@@ -32,11 +32,40 @@ class _HomePageState extends State<HomePage> {
   final _feedbackKey = GlobalKey();
   final _settingsKey = GlobalKey();
   bool _guideChecked = false;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _maybeShowGuide());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeShowGuide();
+      _refreshUnreadNotifications();
+    });
+  }
+
+  Future<void> _refreshUnreadNotifications() async {
+    if (!mounted) return;
+    final profileManager = context.read<ProfileManager>();
+    if (profileManager.isGuestMode || profileManager.currentProfile == null) {
+      if (mounted) setState(() => _unreadNotifications = 0);
+      return;
+    }
+    try {
+      final count = await profileManager.getUnreadFriendNotificationCount();
+      if (mounted) setState(() => _unreadNotifications = count);
+    } catch (_) {
+      if (mounted) setState(() => _unreadNotifications = 0);
+    }
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const UserProfileDisplayPage(),
+      ),
+    );
+    await _refreshUnreadNotifications();
   }
 
   Future<void> _maybeShowGuide() async {
@@ -122,27 +151,41 @@ class _HomePageState extends State<HomePage> {
                       profileManager.currentProfile?.avatarColor;
                   return GestureDetector(
                     key: _profileKey,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) =>
-                              const UserProfileDisplayPage(),
-                        ),
-                      );
-                    },
+                    onTap: _openProfile,
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: avatarColor != null
-                            ? Color(avatarColor)
-                            : Colors.grey.shade300,
-                        child: const Icon(
-                          Icons.person,
-                          color: Colors.white,
-                          size: 20,
-                        ),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          CircleAvatar(
+                            radius: 18,
+                            backgroundColor: avatarColor != null
+                                ? Color(avatarColor)
+                                : Colors.grey.shade300,
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white,
+                              size: 20,
+                            ),
+                          ),
+                          if (_unreadNotifications > 0)
+                            Positioned(
+                              right: -1,
+                              top: -1,
+                              child: Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   );

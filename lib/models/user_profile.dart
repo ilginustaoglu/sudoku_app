@@ -13,6 +13,8 @@ class UserProfile {
   final DateTime? lastPlayedAt;
   final bool emailVerified;
   final String passwordHash; // Şifre hash'i (güvenlik için)
+  /// 6 haneli arkadaş ekleme kodu (örn. "482913")
+  final String friendCode;
 
   UserProfile({
     required this.id,
@@ -29,6 +31,7 @@ class UserProfile {
     this.lastPlayedAt,
     this.emailVerified = false,
     required this.passwordHash,
+    this.friendCode = '',
   });
 
   String get fullName => '$firstName $lastName';
@@ -40,6 +43,9 @@ class UserProfile {
     }
     return fullName;
   }
+
+  bool get hasFriendCode =>
+      friendCode.length == 6 && RegExp(r'^\d{6}$').hasMatch(friendCode);
 
   // JSON'a çevir
   Map<String, dynamic> toJson() {
@@ -58,6 +64,7 @@ class UserProfile {
       'lastPlayedAt': lastPlayedAt?.toIso8601String(),
       'emailVerified': emailVerified,
       'passwordHash': passwordHash,
+      'friendCode': friendCode,
     };
   }
 
@@ -80,6 +87,7 @@ class UserProfile {
           : null,
       emailVerified: json['emailVerified'] as bool? ?? false,
       passwordHash: json['passwordHash'] as String? ?? '',
+      friendCode: json['friendCode'] as String? ?? '',
     );
   }
 
@@ -99,6 +107,7 @@ class UserProfile {
     DateTime? lastPlayedAt,
     bool? emailVerified,
     String? passwordHash,
+    String? friendCode,
   }) {
     return UserProfile(
       id: id ?? this.id,
@@ -115,6 +124,7 @@ class UserProfile {
       lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
       emailVerified: emailVerified ?? this.emailVerified,
       passwordHash: passwordHash ?? this.passwordHash,
+      friendCode: friendCode ?? this.friendCode,
     );
   }
 }

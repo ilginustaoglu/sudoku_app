@@ -11,6 +11,7 @@ grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on public.feedback to anon, authenticated;
 grant select, insert, update, delete on public.profiles to anon, authenticated;
 grant select, insert, update, delete on public.game_scores to anon, authenticated;
+grant select, insert, update, delete on public.friendships to anon, authenticated;
 
 -- ---------------------------------------------------------------------------
 -- feedback policies
@@ -68,3 +69,26 @@ create policy "Anyone can update game scores"
 
 create policy "Anyone can delete game scores"
   on public.game_scores for delete to anon, authenticated using (true);
+
+-- ---------------------------------------------------------------------------
+-- friendships policies
+-- ---------------------------------------------------------------------------
+alter table public.friendships enable row level security;
+
+drop policy if exists "Anyone can insert friendships" on public.friendships;
+drop policy if exists "Anyone can read friendships" on public.friendships;
+drop policy if exists "Anyone can update friendships" on public.friendships;
+drop policy if exists "Anyone can delete friendships" on public.friendships;
+
+create policy "Anyone can insert friendships"
+  on public.friendships for insert to anon, authenticated with check (true);
+
+create policy "Anyone can read friendships"
+  on public.friendships for select to anon, authenticated using (true);
+
+create policy "Anyone can update friendships"
+  on public.friendships for update to anon, authenticated
+  using (true) with check (true);
+
+create policy "Anyone can delete friendships"
+  on public.friendships for delete to anon, authenticated using (true);

@@ -24,11 +24,11 @@ class AppLocalizations {
   ];
 
   static List<LocalizationsDelegate<dynamic>> get localizationsDelegates => [
-        delegate,
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ];
+    delegate,
+    GlobalMaterialLocalizations.delegate,
+    GlobalWidgetsLocalizations.delegate,
+    GlobalCupertinoLocalizations.delegate,
+  ];
 
   static const delegate = _AppLocalizationsDelegate();
 
@@ -137,8 +137,7 @@ class AppLocalizations {
 
   String localizedColorName(String key) => tr(key);
 
-  String localizedColor(Color color) =>
-      localizedColorName(colorNameKey(color));
+  String localizedColor(Color color) => localizedColorName(colorNameKey(color));
 
   // Home
   String get play => tr('play');
@@ -182,6 +181,35 @@ class AppLocalizations {
   String get myFriends => tr('myFriends');
   String get addFriend => tr('addFriend');
   String get comingSoon => tr('comingSoon');
+  String get friendCode => tr('friendCode');
+  String get yourFriendCode => tr('yourFriendCode');
+  String get friendCodeCopied => tr('friendCodeCopied');
+  String get addFriendHint => tr('addFriendHint');
+  String get invalidFriendCode => tr('invalidFriendCode');
+  String get friendCodeNotFound => tr('friendCodeNotFound');
+  String get cannotAddYourself => tr('cannotAddYourself');
+  String get alreadyFriends => tr('alreadyFriends');
+  String friendAdded(String name) => tr('friendAdded', {'name': name});
+  String get friendRemoved => tr('friendRemoved');
+  String get removeFriend => tr('removeFriend');
+  String removeFriendConfirm(String name) =>
+      tr('removeFriendConfirm', {'name': name});
+  String get noFriendsYet => tr('noFriendsYet');
+  String get copyFriendCode => tr('copyFriendCode');
+  String get friendsSetupRequired => tr('friendsSetupRequired');
+  String get notifications => tr('notifications');
+  String get noNotifications => tr('noNotifications');
+  String get accept => tr('accept');
+  String get reject => tr('reject');
+  String friendRequestSent(String name) =>
+      tr('friendRequestSent', {'name': name});
+  String get friendRequestAlreadyExists => tr('friendRequestAlreadyExists');
+  String friendRequestReceived(String name) =>
+      tr('friendRequestReceived', {'name': name});
+  String friendRequestApproved(String name) =>
+      tr('friendRequestApproved', {'name': name});
+  String friendRequestAccepted(String name) =>
+      tr('friendRequestAccepted', {'name': name});
   String get statistics => tr('statistics');
   String get gamesByDifficulty => tr('gamesByDifficulty');
   String get noProfileAvailable => tr('noProfileAvailable');
@@ -192,6 +220,10 @@ class AppLocalizations {
   String get statBestScore => tr('statBestScore');
   String get statAverageScore => tr('statAverageScore');
   String get statTotalTime => tr('statTotalTime');
+  String get statCurrentStreak => tr('statCurrentStreak');
+  String get statBestStreak => tr('statBestStreak');
+  String statStreakDays(int count) =>
+      tr('statStreakDays', {'count': count.toString()});
   String statGamesPlayed(int count) =>
       tr('statGamesPlayed', {'count': count.toString()});
   String get anonymousUser => tr('anonymousUser');
@@ -391,6 +423,16 @@ class AppLocalizations {
     if (lower.contains('profile already exists')) return profileAlreadyExists;
     if (lower.contains('profile not found')) return profileNotFound;
     if (lower.contains('invalid password')) return invalidPassword;
+    if (lower.contains('friend code not found')) return friendCodeNotFound;
+    if (lower.contains('invalid friend code')) return invalidFriendCode;
+    if (lower.contains('cannot add yourself')) return cannotAddYourself;
+    if (lower.contains('already friends')) return alreadyFriends;
+    if (lower.contains('friend request already exists')) {
+      return friendRequestAlreadyExists;
+    }
+    if (lower.contains('friends feature is not set up')) {
+      return friendsSetupRequired;
+    }
     if (lower.contains('feedback service is not configured')) {
       return feedbackNotConfigured;
     }
@@ -402,7 +444,8 @@ class AppLocalizations {
   }
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override

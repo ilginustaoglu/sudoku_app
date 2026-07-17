@@ -5,6 +5,8 @@ import '../l10n/app_localizations.dart';
 import '../models/profile_stats.dart';
 import '../services/profile_manager.dart';
 import '../services/statistics_visibility_manager.dart';
+import 'friends_page.dart';
+import 'notifications_page.dart';
 
 class UserProfileDisplayPage extends StatefulWidget {
   const UserProfileDisplayPage({super.key});
@@ -16,6 +18,7 @@ class UserProfileDisplayPage extends StatefulWidget {
 class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
   ProfileStats? _stats;
   bool _isLoading = true;
+  int _unreadNotifications = 0;
   String? _expandedDifficulty;
 
   @override
@@ -37,12 +40,35 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
 
     final profileId = profileManager.currentProfile!.id;
     final stats = await profileManager.getProfileStats(profileId);
+    var unreadNotifications = 0;
+    try {
+      unreadNotifications = await profileManager
+          .getUnreadFriendNotificationCount();
+    } catch (_) {
+      // Arkadaşlık şeması kurulmadan profil ekranı çalışmaya devam eder.
+    }
 
     if (mounted) {
       setState(() {
         _stats = stats;
+        _unreadNotifications = unreadNotifications;
         _isLoading = false;
       });
+    }
+  }
+
+  Future<void> _openNotifications() async {
+    await Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const NotificationsPage()));
+    if (!mounted) return;
+    try {
+      final count = await context
+          .read<ProfileManager>()
+          .getUnreadFriendNotificationCount();
+      if (mounted) setState(() => _unreadNotifications = count);
+    } catch (_) {
+      if (mounted) setState(() => _unreadNotifications = 0);
     }
   }
 
@@ -55,15 +81,28 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
       appBar: AppBar(
         title: Text(l10n.profile),
         centerTitle: true,
+        actions: [
+          IconButton(
+            tooltip: l10n.notifications,
+            onPressed: _openNotifications,
+            icon: Badge(
+              isLabelVisible: _unreadNotifications > 0,
+              label: Text(
+                _unreadNotifications > 99
+                    ? '99+'
+                    : _unreadNotifications.toString(),
+              ),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+          ),
+        ],
       ),
       body: Consumer<ProfileManager>(
         builder: (context, profileManager, child) {
           final profile = profileManager.currentProfile;
-          
+
           if (profile == null || profileManager.isGuestMode) {
-            return Center(
-              child: Text(l10n.noProfileAvailable),
-            );
+            return Center(child: Text(l10n.noProfileAvailable));
           }
 
           return SingleChildScrollView(
@@ -72,7 +111,7 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 const SizedBox(height: 20),
-                
+
                 Container(
                   width: 120,
                   height: 120,
@@ -103,13 +142,9 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                             },
                           ),
                         )
-                      : const Icon(
-                          Icons.person,
-                          size: 60,
-                          color: Colors.white,
-                        ),
+                      : const Icon(Icons.person, size: 60, color: Colors.white),
                 ),
-                
+
                 const SizedBox(height: 20),
 
                 Text(
@@ -119,31 +154,30 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                
+
                 const SizedBox(height: 24),
 
-                Row(
-                  children: [
-                    Expanded(
-                      child: _ComingSoonButton(
-                        label: l10n.myFriends,
-                        comingSoon: l10n.comingSoon,
-                        icon: Icons.people_outline,
-                      ),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const FriendsPage()),
+                      );
+                    },
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: _ComingSoonButton(
-                        label: l10n.addFriend,
-                        comingSoon: l10n.comingSoon,
-                        icon: Icons.person_add_outlined,
-                      ),
+                    icon: const Icon(Icons.people_outline, size: 18),
+                    label: Text(
+                      l10n.myFriends,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
                     ),
-                  ],
+                  ),
                 ),
-                
+
                 const SizedBox(height: 32),
-                
+
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -157,13 +191,17 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                     Consumer<StatisticsVisibilityManager>(
                       builder: (context, visibilityManager, child) {
                         return Tooltip(
-                          message: l10n.visibilityLabel(visibilityManager.visibility),
+                          message: l10n.visibilityLabel(
+                            visibilityManager.visibility,
+                          ),
                           child: Icon(
-                            visibilityManager.visibility == StatisticsVisibility.onlyMe
+                            visibilityManager.visibility ==
+                                    StatisticsVisibility.onlyMe
                                 ? Icons.lock
-                                : visibilityManager.visibility == StatisticsVisibility.friends
-                                    ? Icons.people
-                                    : Icons.public,
+                                : visibilityManager.visibility ==
+                                      StatisticsVisibility.friends
+                                ? Icons.people
+                                : Icons.public,
                             color: Colors.grey.shade600,
                             size: 20,
                           ),
@@ -172,9 +210,9 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
                     ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 24),
-                
+
                 // İstatistikler
                 if (_isLoading)
                   const Center(child: CircularProgressIndicator())
@@ -199,6 +237,28 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
 
     return Column(
       children: [
+        Row(
+          children: [
+            Expanded(
+              child: _buildStatCard(
+                l10n.statCurrentStreak,
+                l10n.statStreakDays(stats.currentStreak),
+                Icons.local_fire_department,
+                const Color(0xFFE65100),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _buildStatCard(
+                l10n.statBestStreak,
+                l10n.statStreakDays(stats.bestStreak),
+                Icons.whatshot,
+                const Color(0xFFC62828),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
         Row(
           children: [
             Expanded(
@@ -254,10 +314,7 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
           alignment: Alignment.centerLeft,
           child: Text(
             l10n.gamesByDifficulty,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
+            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),
         ),
         const SizedBox(height: 12),
@@ -349,8 +406,7 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
       child: InkWell(
         onTap: () {
           setState(() {
-            _expandedDifficulty =
-                isExpanded ? null : stats.difficulty;
+            _expandedDifficulty = isExpanded ? null : stats.difficulty;
           });
         },
         borderRadius: BorderRadius.circular(12),
@@ -514,63 +570,6 @@ class _UserProfileDisplayPageState extends State<UserProfileDisplayPage> {
             ),
           ),
         ],
-      ),
-    );
-  }
-
-}
-
-class _ComingSoonButton extends StatelessWidget {
-  const _ComingSoonButton({
-    required this.label,
-    required this.comingSoon,
-    required this.icon,
-  });
-
-  final String label;
-  final String comingSoon;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.55,
-      child: OutlinedButton(
-        onPressed: null,
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-          foregroundColor: Colors.grey.shade700,
-          disabledForegroundColor: Colors.grey.shade700,
-          side: BorderSide(color: Colors.grey.shade400),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(icon, size: 18),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    label,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            Text(
-              comingSoon,
-              style: TextStyle(
-                fontSize: 11,
-                fontStyle: FontStyle.italic,
-                color: Colors.grey.shade600,
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
